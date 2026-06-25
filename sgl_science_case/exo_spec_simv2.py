@@ -19,6 +19,7 @@ Setup:
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from scipy.signal import correlate
 
 from hapi import (
@@ -270,6 +271,9 @@ def add_gaussian_noise(data, SNR, seed = 8):
 #     lags = np.arange(-len(t) + 1, len(t))
 #     return lags, ccf
 
+# -----------------------------------------------------------------------------
+# cross correlation function for use in this script:
+
 def cross_correlate(template, data):
     """Compute the cross-correlation function (CCF) of a template and data."""
     good = np.isfinite(template) & np.isfinite(data)
@@ -293,6 +297,84 @@ def cross_correlate(template, data):
 
     return lags, ccf
 
+# -----------------------------------------------------------------------------
+# cross correlation function for use in my notebook:
+def run_cross_correlation(data_dict, noisy_combined, molecule='CH4', isotope=1, combined_template = False):
+    """
+    Run cross-correlation for all resolutions and SNRs.
+    
+    Parameters:
+        data_dict: your high-res / binned dictionary (resolution -> mol -> iso -> data)
+        noisy_combined: your noisy test spectra dictionary
+        molecule: which molecule to use as template
+        isotope: which isotope to use as template
+    
+    Returns:
+        pd.DataFrame with results + full CCFs and lags
+    """
+    results = []
+    
+    print(f"Cross-correlating using template: {molecule} (isotope {isotope})\n")
+    
+    for res in noisy_combined:
+
+        #template spectra combined or pure?
+        if combined_template:
+            template_data = data_dict[res]
+            template_spectra = template_data['combined_trans']
+            wl_grid = template_data['wl_grid'].copy()
+        else:
+            template_data = data_dict[res][molecule][isotope]
+            template_spectra = template_data['transmission']
+            wl_grid = template_data['wavelength_grid'].copy()
+        
+        for snr_key in noisy_combined[res]:
+            test_data = noisy_combined[res][snr_key]
+            test_spectra = test_data['Transmission']
+            
+            # Zero-mean, unit-variance normalization
+            parent_norm = (template_spectra - np.mean(template_spectra)) / np.std(template_spectra)
+            test_norm   = (test_spectra   - np.mean(test_spectra))   / np.std(test_spectra)
+            
+            # Cross-correlation
+            ccf = correlate(parent_norm, test_norm, mode='full')
+            ccf /= np.sqrt(np.sum(parent_norm**2) * np.sum(test_norm**2))  # normalize
+            
+            lags = np.arange(-len(parent_norm) + 1, len(parent_norm))
+            
+            # Improved SNR using noise-only regions
+            max_corr = np.max(ccf)
+            peak_idx = np.argmax(ccf)
+            ccf_length = len(ccf)
+            
+            window_size = int(0.15 * ccf_length)   # ~15% of CCF on each side of peak
+            noise_mask = np.ones(ccf_length, dtype=bool)
+            noise_mask[max(0, peak_idx - window_size): min(ccf_length, peak_idx + window_size)] = False
+            
+            noise_values = ccf[noise_mask]
+            noise_std = np.std(noise_values) if len(noise_values) > 20 else np.std(ccf)
+            
+            cc_snr = ccf / noise_std if noise_std > 0 else 0
+            cc_uncertainty = noise_std
+            
+            results.append({
+                'snr': snr_key,
+                'resolution': res,
+                'max_correlation': max_corr,
+                'cc_snr': cc_snr,
+                'cc_uncertainty': cc_uncertainty,
+                'lags': lags,
+                'ccf': ccf,
+                'template_molecule': molecule,
+                'template_isotope': isotope
+            })
+            
+            print(f"  → R = {res:,} | {snr_key} | max_corr = {max_corr:.4f} | CC-SNR = {np.max(cc_snr):.2f}")
+    
+    df_results = pd.DataFrame(results)
+    print(f"\nFinished! Created {len(df_results)} cross-correlation results.")
+    
+    return df_results
 
 def claude_detection_significance(ccf):
     peak_idx = np.argmax(np.abs(ccf))
