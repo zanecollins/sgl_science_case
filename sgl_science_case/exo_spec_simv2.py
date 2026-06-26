@@ -297,6 +297,8 @@ def cross_correlate(template, data):
 
     return lags, ccf
 
+
+
 # -----------------------------------------------------------------------------
 # cross correlation function for use in my notebook:
 def run_cross_correlation(data_dict, noisy_combined, molecule='CH4', isotope=1, combined_template = False):
