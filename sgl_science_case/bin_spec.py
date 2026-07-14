@@ -32,9 +32,16 @@ def bin_spectrum(wl_native, spectrum_native, R_bin, err_data = []):
 
     '''
         
+    # Ensure wavelength array is sorted ascending
+    if wl_native[0] > wl_native[-1]:
+        wl_native = wl_native[::-1]
+        spectrum_native = spectrum_native[::-1]
+        if len(err_data) > 0:
+            err_data = err_data[::-1]
+
     # Create binned wavelength grid at resolution R_bin
     delta_log_wl_bins = 1.0/R_bin
-    N_wl_bins = (np.log(wl_native[0]) - np.log(wl_native[-1])) / delta_log_wl_bins
+    N_wl_bins = (np.log(wl_native[-1]) - np.log(wl_native[0])) / delta_log_wl_bins
     N_wl_bins = np.around(N_wl_bins).astype(np.int64)
     log_wl_binned = np.linspace(np.log(wl_native[0]), np.log(wl_native[-1]), N_wl_bins)    
     wl_binned = np.exp(log_wl_binned)
