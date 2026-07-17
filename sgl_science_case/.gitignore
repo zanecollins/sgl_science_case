@@ -138,3 +138,5 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+sgl_science_case/res_dict_large.pkl.gz
+*.pkl.gz # optional, ignore all large pickles
