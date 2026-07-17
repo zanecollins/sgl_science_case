@@ -8,6 +8,7 @@ __pycache__/
 *.hdf5
 *.fits
 *.pkl
+*.gz
 data/
 archive/*/co2_isotopologue_data/   # or broader
 # C extensions
