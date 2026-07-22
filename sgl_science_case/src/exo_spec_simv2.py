@@ -25,7 +25,7 @@ from scipy.signal import correlate
 from hapi import (
     db_begin, fetch, absorptionCoefficient_Voigt, ISO, ISO_INDEX, tableList,
 )
-from bin_spec import bin_spectrum
+from src.bin_spec import bin_spectrum
 
 # -----------------------------------------------------------------------------
 # Configuration

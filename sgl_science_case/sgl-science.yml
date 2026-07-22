@@ -1,0 +1,13 @@
+name: sgl-science
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - jupyter
+  - scipy
+  - ipykernel
+  - numpy
+  - matplotlib
+  - astropy
+  - pip
+prefix: /Users/zaniaccollins/miniconda3/envs/sgl-science
