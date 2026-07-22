@@ -8,10 +8,11 @@ Example:
     --atmosphere ~/sgl_science_case/.../atmosphere_profile.csv \\
     --abs-coef-dir ~/orcd/scratch/sgl_science_case/abs_coef_cache \\
     --out-dir ~/orcd/pool/sgl_science_case/spectra_cache \\
+    --ref_therm Thermal \\
     --cloud-top 8.0 --albedo 0.3 \\
     --resolutions 1e5 1e6 1e7 5e7 \\
     --snrs 3 5 10 15 20 25 50 \\
-    --scenarios H2O+CH4 H2O+CH4+N2O
+    --scenarios H2O+CH4 H2O+CH4+N2O \\
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ def parse_args():
     p.add_argument("--atmosphere", required=True)
     p.add_argument("--abs-coef-dir", required=True)
     p.add_argument("--out-dir", required=True)
+    p.add_argument("--ref_therm", required=True)
     p.add_argument("--cloud-top", type=float, default=8.0)
     p.add_argument("--albedo", type=float, default=0.3)
     p.add_argument("--resolutions", nargs="+", type=float, default=[1e5, 1e6, 1e7])
@@ -172,6 +174,87 @@ def compute_reflectivity(scenario, df_atm, abs_coef_dir, cloud_top, albedo):
     print(f"  max tau_rt={np.max(tau_rt):.3f}  refl range {reflectivity.min():.4f}–{reflectivity.max():.4f}")
     return wavelengths, reflectivity
 
+def planck_wn(wn_cm, T):
+    """Planck function in wavenumber units [wn in cm^-1, T in K].
+    Returns B_wn in erg/s/cm^2/sr/cm^-1 (cgs). Scale is arbitrary for template matching.
+    """
+    # B_ν = 2 h c^2 ν^3 / (exp(hcν/kT) - 1)
+    # ν in cm^-1; use hc/k = 1.4388 cm K
+    wn = np.asarray(wn_cm, dtype=np.float64)
+    c1 = 1.191042972e-5   # 2hc^2 in appropriate cgs scaling for wn
+    c2 = 1.4387769          # hc/k [cm K]
+    x = c2 * wn / T
+    # stable for large x
+    return c1 * wn**3 / np.expm1(x)
+
+def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top=8.0, T_surface=None):
+    """
+    Simple nadir thermal emission:
+      I = B(T_surf) e^{-τ_tot} + Σ B(T_i) e^{-τ_above,i} (1 - e^{-Δτ_i})
+    Layers ordered from surface/cloud upward.
+    """
+    above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy()  # keep original index
+
+    print(f"Computing thermal emission above {cloud_top} km ({len(above_df)} layers)")
+
+    alt_km = above_df["ALT_km"].values
+    dz_km = np.diff(alt_km, append=alt_km[-1] + np.median(np.diff(alt_km)))
+    dz_cm = dz_km * 1e5
+    temps = above_df["TEMP_K"].values
+
+    # Surface/cloud temperature
+    if T_surface is None:
+        T_surface = float(temps[0])  # cloud-top temperature
+
+    # --- accumulate per-layer delta_tau (sum over molecules) ---
+    delta_tau_layers = None  # shape (n_layers, n_wn)
+    wn_grid_ref = None
+
+    n_layers = len(above_df)
+    for mol, iso in molecules_isotopes:
+        col_name = f"{mol}_ppmv"
+        if col_name not in df_atm.columns:
+            print(f"ERROR: missing {col_name}")
+            continue
+        print(f"→ {mol} iso{iso}")
+
+        for layer_pos, (orig_idx, row) in enumerate(above_df.iterrows()):
+            wn_grid, coef = load_abs_coef(mol, iso, orig_idx, abs_coef_dir)  # fix index if needed
+            if wn_grid_ref is None:
+                wn_grid_ref = wn_grid
+                delta_tau_layers = np.zeros((n_layers, len(coef)), dtype=np.float64)
+
+            # Match your cache convention (VMR in or out of coef)
+            ppmv = float(row[col_name])
+            vmr = ppmv * 1e-6
+            delta_tau_layers[layer_pos] += coef * vmr * dz_cm[layer_pos]
+            # if VMR already in coef:
+            # delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos]
+
+    if delta_tau_layers is None:
+        raise ValueError("No tau accumulated")
+
+    # --- thermal RT: surface + layers, bottom → top ---
+    # tau_above[i] = optical depth from top of layer i to space
+    # For bottom-up: start from surface, attenuate and add layer emission
+
+    I = planck_wn(wn_grid_ref, T_surface)  # surface / cloud emission
+
+    # layers from bottom (cloud) to top
+    for i in range(n_layers):
+        dtau = delta_tau_layers[i]
+        # avoid overflow
+        transm = np.exp(-np.minimum(dtau, 50.0))
+        B = planck_wn(wn_grid_ref, temps[i])
+        # I from below, attenuated through layer, plus layer emission
+        I = I * transm + B * (1.0 - transm)
+
+    wavelengths_um = (1e4 / wn_grid_ref).astype(np.float32)
+    radiance = I.astype(np.float32)
+
+    print(f"Radiance range: {radiance.min():.3e} – {radiance.max():.3e}")
+    return wavelengths_um, radiance
+
 def parse_scenario(s: str):
     """'H2O+CH4+N2O' -> [('H2O',1), ('CH4',1), ('N2O',1)]"""
     return [(part, 1) for part in s.split("+")]
@@ -192,14 +275,14 @@ def main():
         #     continue
 
         print(f"\n=== Scenario {scen_str} ===")
-        wl_high, refl_high = compute_reflectivity(
+        wl_high, radiance_high = compute_reflectivity(
             scenario, df_atm, abs_dir, args.cloud_top, args.albedo
         )
 
         scenario_dict = {}
         for R in args.resolutions:
             print(f"  Binning to R={R:.2e}")
-            wl_b, refl_b = bin_spectrum_robust(wl_high, refl_high, R)
+            wl_b, refl_b = bin_spectrum_robust(wl_high, radiance_high, R)
             entry = {
                 "wavelength_grid": wl_b.astype(np.float32),
                 "reflectivity_clean": refl_b.astype(np.float32),
@@ -215,7 +298,7 @@ def main():
             pickle.dump(scenario_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
         print(f"  Saved → {out_path}")
 
-        del wl_high, refl_high, scenario_dict
+        del wl_high, radiance_high, scenario_dict
         gc.collect()
 
     print("\nAll scenarios done.")
