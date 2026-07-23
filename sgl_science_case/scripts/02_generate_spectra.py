@@ -212,7 +212,7 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
 
     n_layers = len(above_df)
     for mol, iso in molecules_isotopes:
-        col_name = f"{mol}_ppmv"
+        col_name = f"{mol}_iso{iso}_ppmv"
         if col_name not in df_atm.columns:
             print(f"ERROR: missing {col_name}")
             continue
@@ -256,8 +256,36 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
     return wavelengths_um, radiance
 
 def parse_scenario(s: str):
-    """'H2O+CH4+N2O' -> [('H2O',1), ('CH4',1), ('N2O',1)]"""
-    return [(part, 1) for part in s.split("+")]
+    """
+    Parse scenario strings into list of (molecule, isotope).
+
+    Accepted forms:
+      'H2O+CH4+N2O'      -> [('H2O', 1), ('CH4', 1), ('N2O', 1)]
+      'CO2:1'            -> [('CO2', 1)]
+      'H2O:1+CH4:1'      -> [('H2O', 1), ('CH4', 1)]
+      'H2O+CH4:1'        -> [('H2O', 1), ('CH4', 1)]
+    """
+    s = s.strip()
+    if not s:
+        raise ValueError("Empty scenario string")
+
+    out = []
+    for part in s.split("+"):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            mol, iso = part.split(":", 1)
+            mol, iso = mol.strip(), iso.strip()
+            if not mol or not iso:
+                raise ValueError(f"Bad segment in scenario {s!r}: {part!r}")
+            out.append((mol, int(iso)))
+        else:
+            out.append((part, 1))
+
+    if not out:
+        raise ValueError(f"No molecules parsed from {s!r}")
+    return out
 
 def main():
     args = parse_args()
