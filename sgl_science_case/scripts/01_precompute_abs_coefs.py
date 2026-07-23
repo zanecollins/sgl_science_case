@@ -47,7 +47,7 @@ def compute_absorption_coefficient(molecule, isotope, dwn, altitude_idx, df_atm,
 
     #From atmosphere profile table, retrive pressure, vmr, and temperature at input layer
     p_atm = df_atm["PRES_mb"].iloc[altitude_idx] / 1013.25
-    vmr = df_atm[f"{molecule}_ppmv"].iloc[altitude_idx] / 1e6
+    vmr = df_atm[f"{molecule}_iso{isotope}_ppmv"].iloc[altitude_idx] / 1e6
     T = df_atm["TEMP_K"].iloc[altitude_idx]
     print(f"  {molecule} iso{isotope} alt={altitude_idx} T={T:.1f}K p={p_atm:.4f} vmr={vmr:.3e}")
 

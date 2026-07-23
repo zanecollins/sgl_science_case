@@ -294,10 +294,10 @@ def main():
                 "radiance_clean": rad_b.astype(np.float32),
                 "resolution": int(R),
             }
-            # for snr in args.snrs:
-            #     noisy, err = inject_poisson_noise(rad_b, snr)
-            #     entry[f"rad_snr{int(snr)}"] = noisy
-            #     entry[f"error_snr{int(snr)}"] = err
+            for snr in args.snrs:
+                noisy, err = inject_poisson_noise(rad_b, snr)
+                entry[f"radiance_snr{int(snr)}"] = noisy
+                entry[f"error_snr{int(snr)}"] = err
             scenario_dict[int(R)] = entry
 
         with open(out_path, "wb") as f:

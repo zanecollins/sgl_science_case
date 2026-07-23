@@ -1,0 +1,27 @@
+Traceback (most recent call last):
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3641, in get_loc
+    return self._engine.get_loc(casted_key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "pandas/_libs/index.pyx", line 168, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/index.pyx", line 197, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7668, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7676, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'CH4_iso1_ppmv'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/01_precompute_abs_coefs.py", line 120, in <module>
+    main()
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/01_precompute_abs_coefs.py", line 111, in main
+    wn, coef = compute_absorption_coefficient(mol, iso, args.dwn, alt, df_atm, wn_min, wn_max)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/01_precompute_abs_coefs.py", line 50, in compute_absorption_coefficient
+    vmr = df_atm[f"{molecule}_iso{isotope}_ppmv"].iloc[altitude_idx] / 1e6
+          ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/core/frame.py", line 4378, in __getitem__
+    indexer = self.columns.get_loc(key)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3648, in get_loc
+    raise KeyError(key) from err
+KeyError: 'CH4_iso1_ppmv'

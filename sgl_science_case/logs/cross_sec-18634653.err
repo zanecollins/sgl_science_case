@@ -1,5 +1,0 @@
-usage: 01_precompute_abs_coefs.py [-h] --atmosphere ATMOSPHERE --hapi-db HAPI_DB --out-dir OUT_DIR [--dwn DWN] [--wl-min WL_MIN] [--wl-max WL_MAX] [--cloud-top CLOUD_TOP]
-                                  [--molecules MOLECULES [MOLECULES ...]]
-01_precompute_abs_coefs.py: error: the following arguments are required: --out-dir
-/var/spool/slurmd/job18634653/slurm_script: line 17: --out-dir: command not found
-/var/spool/slurmd/job18634653/slurm_script: line 19: --cloud-top: command not found

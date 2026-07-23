@@ -1,3 +1,0 @@
-python: can't open file '/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/01_generate_spectra.py': [Errno 2] No such file or directory
-/var/spool/slurmd/job18557942/slurm_script: line 17: --out-dir: command not found
-/var/spool/slurmd/job18557942/slurm_script: line 19: --cloud-top: command not found
