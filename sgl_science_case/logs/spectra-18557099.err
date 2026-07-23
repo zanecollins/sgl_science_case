@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 313, in <module>
+    main()
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 268, in main
+    df_atm = pd.read_csv(args.atmosphere)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'data/external/atmosphere_profile.csv'

@@ -275,9 +275,15 @@ def main():
         #     continue
 
         print(f"\n=== Scenario {scen_str} ===")
-        wl_high, radiance_high = compute_reflectivity(
-            scenario, df_atm, abs_dir, args.cloud_top, args.albedo
-        )
+
+        if args.ref_therm.lower() == "thermal":
+            wl_high, radiance_high = compute_thermal_emission(
+                scenario, df_atm, abs_dir, args.cloud_top, args.albedo
+            )
+        else:
+            wl_high, radiance_high = compute_reflectivity(
+                scenario, df_atm, abs_dir, args.cloud_top, args.albedo
+            )
 
         scenario_dict = {}
         for R in args.resolutions:
