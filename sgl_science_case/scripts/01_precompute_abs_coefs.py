@@ -8,7 +8,8 @@ Example:
     --atmosphere ~/sgl_science_case/sgl_science_case/data/atmosphere_profile.csv \\
     --hapi-db ~/sgl_science_case/sgl_science_case/notebooks/HAPI_DB \\
     --out-dir ~/orcd/pool/sgl_science_case/abs_coef_cache \\
-    --dwn 1e-5 --cloud-top 8.0 \\
+    --dwn 1e-5 \\
+    --cloud-top 8.0 \\
     --molecules H2O:1 CH4:1 N2O:1
 """
 
@@ -26,7 +27,7 @@ def parse_args():
     p.add_argument("--dwn", type=float, default=1e-5)
     p.add_argument("--wl-min", type=float, default=7.0)
     p.add_argument("--wl-max", type=float, default=8.5)
-    p.add_argument("--cloud-top", type=float, default=8.0)
+    p.add_argument("--cloud-top", type=float, default=0.0)
     p.add_argument("--molecules", nargs="+", default=["H2O:1", "CH4:1", "N2O:1"])
     return p.parse_args()
 
@@ -38,13 +39,19 @@ def get_molecule_id(name):
     raise ValueError(f"Molecule {name} not found")
 
 def compute_absorption_coefficient(molecule, isotope, dwn, altitude_idx, df_atm, wn_min, wn_max):
-    from hapi import absorptionCoefficient_Voigt
+    from hapi import absorptionCoefficient_Voigt #Computes absorption cross sections through Hapi
+
+    # Retrieve molecule id and table of linelists
     M = get_molecule_id(molecule)
     table_name = f"{molecule}_iso{isotope}"
+
+    #From atmosphere profile table, retrive pressure, vmr, and temperature at input layer
     p_atm = df_atm["PRES_mb"].iloc[altitude_idx] / 1013.25
     vmr = df_atm[f"{molecule}_ppmv"].iloc[altitude_idx] / 1e6
     T = df_atm["TEMP_K"].iloc[altitude_idx]
     print(f"  {molecule} iso{isotope} alt={altitude_idx} T={T:.1f}K p={p_atm:.4f} vmr={vmr:.3e}")
+
+    #Compute absorption coefficient - this is the most computationally expensive.
     wn, coef = absorptionCoefficient_Voigt(
         Components=[(M, isotope, vmr)],
         Diluent={"self": vmr, "air": 1.0 - vmr},
@@ -74,12 +81,15 @@ def ensure_tables(molecules_isotopes, wn_min, wn_max, hapi_db):
         fetch(tname, mol_id(mol), iso, wn_min, wn_max)
 
 def main():
+
+    #parse the arguments and initialize the output directories
     args = parse_args()
     out_dir = Path(os.path.expanduser(args.out_dir))
     out_dir.mkdir(parents=True, exist_ok=True)
     wn_min, wn_max = 1e4 / args.wl_max, 1e4 / args.wl_min
     molecules_isotopes = [(m.split(":")[0], int(m.split(":")[1])) for m in args.molecules]
 
+    #read in atmospheric profile table 
     df_atm = pd.read_csv(args.atmosphere)
     altitudes = df_atm.index[df_atm["ALT_km"] >= args.cloud_top].tolist()
     print(f"Layers >= {args.cloud_top} km: {len(altitudes)}")

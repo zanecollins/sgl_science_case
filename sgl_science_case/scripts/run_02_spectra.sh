@@ -16,8 +16,8 @@ python scripts/02_generate_spectra.py \
   --abs-coef-dir ~/orcd/pool/sgl_science_case/abs_coef_cache_dwn1e-4 \
   --out-dir ~/orcd/pool/sgl_science_case/spectra_dict_cache \
   --ref_therm Thermal \
-  --cloud-top 8.0 \
+  --cloud-top 0 \
   --albedo 0.3 \
-  --resolutions 1e5 1e6 1e7 \
+  --resolutions 1e5 1e6 \
   --snrs 3 5 10 15 20 25 50 \
-  --scenarios H2O+CH4 H2O+CH4+N2O
+  --scenarios H2O+CH4

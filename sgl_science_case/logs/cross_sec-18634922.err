@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/01_precompute_abs_coefs.py", line 117, in <module>
+    main()
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/01_precompute_abs_coefs.py", line 94, in main
+    ensure_tables(molecules_isotopes, wn_min, wn_max, os.path.expanduser(args.hapi_db))
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/01_precompute_abs_coefs.py", line 68, in ensure_tables
+    db_begin(hapi_db)
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/hapi/hapi.py", line 4844, in db_begin
+    databaseBegin(db)
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/hapi/hapi.py", line 1381, in databaseBegin
+    loadCache()
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/hapi/hapi.py", line 1361, in loadCache
+    storage2cache(TableName)
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/hapi/hapi.py", line 1184, in storage2cache
+    data_matrix.append([cvt(line) for cvt in converters])
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/hapi/hapi.py", line 1184, in <listcomp>
+    data_matrix.append([cvt(line) for cvt in converters])
+                        ^^^^^^^^^
+  File "/home/zaniacco/.conda/envs/sgl-science/lib/python3.11/site-packages/hapi/hapi.py", line 1170, in cfunc
+    return dtype(line[start:end])
+           ^^^^^^^^^^^^^^^^^^^^^^
+ValueError: invalid literal for int() with base 10: 've'

@@ -1,0 +1,196 @@
+Layers >= 0.0 km: 50
+HAPI version: 1.3.0.0
+To get the most up-to-date version please check http://hitran.org/hapi
+ATTENTION: Python versions of partition sums from TIPS-2021 are now available in HAPI code
+
+           MIT license: Copyright 2021 HITRAN team, see more at http://hitran.org. 
+
+           If you use HAPI in your research or software development,
+           please cite it using the following reference:
+           R.V. Kochanov, I.E. Gordon, L.S. Rothman, P. Wcislo, C. Hill, J.S. Wilzewski,
+           HITRAN Application Programming Interface (HAPI): A comprehensive approach
+           to working with spectroscopic data, J. Quant. Spectrosc. Radiat. Transfer 177, 15-30 (2016)
+           DOI: 10.1016/j.jqsrt.2016.03.005
+
+           ATTENTION: This is the core version of the HITRAN Application Programming Interface.
+                      For more efficient implementation of the absorption coefficient routine, 
+                      as well as for new profiles, parameters and other functional,
+                      please consider using HAPI2 extension library.
+                      HAPI2 package is available at http://github.com/hitranonline/hapi2
+
+Using /home/zaniacco/sgl_science_case/sgl_science_case/notebooks/HAPI_DB
+
+N2O_iso1
+                     Lines parsed: 16617
+H2O_iso1
+                     Lines parsed: 2120
+CH4_iso1
+                     Lines parsed: 21535
+✓ H2O_iso1 present
+✓ CH4_iso1 present
+Skipping H2O_iso1_alt008.npz
+Skipping H2O_iso1_alt009.npz
+Skipping H2O_iso1_alt010.npz
+Skipping H2O_iso1_alt011.npz
+Skipping H2O_iso1_alt012.npz
+Skipping H2O_iso1_alt013.npz
+Skipping H2O_iso1_alt014.npz
+Skipping H2O_iso1_alt015.npz
+Skipping H2O_iso1_alt016.npz
+Skipping H2O_iso1_alt017.npz
+Skipping H2O_iso1_alt018.npz
+Skipping H2O_iso1_alt019.npz
+Skipping H2O_iso1_alt020.npz
+Skipping H2O_iso1_alt021.npz
+Skipping H2O_iso1_alt022.npz
+Skipping H2O_iso1_alt023.npz
+Skipping H2O_iso1_alt024.npz
+Skipping H2O_iso1_alt025.npz
+Skipping H2O_iso1_alt026.npz
+Skipping H2O_iso1_alt027.npz
+Skipping H2O_iso1_alt028.npz
+Skipping H2O_iso1_alt029.npz
+Skipping H2O_iso1_alt030.npz
+Skipping H2O_iso1_alt031.npz
+Skipping H2O_iso1_alt032.npz
+Skipping H2O_iso1_alt033.npz
+Skipping H2O_iso1_alt034.npz
+Skipping H2O_iso1_alt035.npz
+Skipping H2O_iso1_alt036.npz
+Skipping H2O_iso1_alt037.npz
+Skipping H2O_iso1_alt038.npz
+Skipping H2O_iso1_alt039.npz
+Skipping H2O_iso1_alt040.npz
+Skipping H2O_iso1_alt041.npz
+Skipping H2O_iso1_alt042.npz
+Skipping H2O_iso1_alt043.npz
+Skipping H2O_iso1_alt044.npz
+Skipping H2O_iso1_alt045.npz
+Skipping H2O_iso1_alt046.npz
+Skipping H2O_iso1_alt047.npz
+Skipping H2O_iso1_alt048.npz
+Skipping H2O_iso1_alt049.npz
+Skipping CH4_iso1_alt008.npz
+Skipping CH4_iso1_alt009.npz
+Skipping CH4_iso1_alt010.npz
+Skipping CH4_iso1_alt011.npz
+Skipping CH4_iso1_alt012.npz
+Skipping CH4_iso1_alt013.npz
+Skipping CH4_iso1_alt014.npz
+Skipping CH4_iso1_alt015.npz
+Skipping CH4_iso1_alt016.npz
+Skipping CH4_iso1_alt017.npz
+Skipping CH4_iso1_alt018.npz
+Skipping CH4_iso1_alt019.npz
+Skipping CH4_iso1_alt020.npz
+Skipping CH4_iso1_alt021.npz
+Skipping CH4_iso1_alt022.npz
+Skipping CH4_iso1_alt023.npz
+Skipping CH4_iso1_alt024.npz
+Skipping CH4_iso1_alt025.npz
+Skipping CH4_iso1_alt026.npz
+Skipping CH4_iso1_alt027.npz
+Skipping CH4_iso1_alt028.npz
+Skipping CH4_iso1_alt029.npz
+Skipping CH4_iso1_alt030.npz
+Skipping CH4_iso1_alt031.npz
+Skipping CH4_iso1_alt032.npz
+Skipping CH4_iso1_alt033.npz
+Skipping CH4_iso1_alt034.npz
+Skipping CH4_iso1_alt035.npz
+Skipping CH4_iso1_alt036.npz
+Skipping CH4_iso1_alt037.npz
+Skipping CH4_iso1_alt038.npz
+Skipping CH4_iso1_alt039.npz
+Skipping CH4_iso1_alt040.npz
+Skipping CH4_iso1_alt041.npz
+Skipping CH4_iso1_alt042.npz
+Skipping CH4_iso1_alt043.npz
+Skipping CH4_iso1_alt044.npz
+Skipping CH4_iso1_alt045.npz
+Skipping CH4_iso1_alt046.npz
+Skipping CH4_iso1_alt047.npz
+Skipping CH4_iso1_alt048.npz
+Skipping CH4_iso1_alt049.npz
+Tasks remaining: 16
+[1/16] H2O iso1 alt 0
+  H2O iso1 alt=0 T=299.7K p=0.9998 vmr=2.590e-02
+{'self': np.float64(0.0259), 'air': np.float64(0.9741)}
+6.006734 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[2/16] H2O iso1 alt 1
+  H2O iso1 alt=1 T=293.7K p=0.8922 vmr=1.950e-02
+{'self': np.float64(0.0195), 'air': np.float64(0.9805)}
+3.016662 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[3/16] H2O iso1 alt 2
+  H2O iso1 alt=2 T=287.7K p=0.7945 vmr=1.530e-02
+{'self': np.float64(0.0153), 'air': np.float64(0.9847)}
+2.740414 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[4/16] H2O iso1 alt 3
+  H2O iso1 alt=3 T=283.7K p=0.7057 vmr=8.600e-03
+{'self': np.float64(0.0086), 'air': np.float64(0.9914)}
+2.483840 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[5/16] H2O iso1 alt 4
+  H2O iso1 alt=4 T=277.0K p=0.6247 vmr=4.440e-03
+{'self': np.float64(0.00444), 'air': np.float64(0.99556)}
+2.265259 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[6/16] H2O iso1 alt 5
+  H2O iso1 alt=5 T=270.3K p=0.5517 vmr=3.350e-03
+{'self': np.float64(0.00335), 'air': np.float64(0.99665)}
+2.085550 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[7/16] H2O iso1 alt 6
+  H2O iso1 alt=6 T=263.6K p=0.4856 vmr=2.100e-03
+{'self': np.float64(0.0021), 'air': np.float64(0.9979)}
+1.935662 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[8/16] H2O iso1 alt 7
+  H2O iso1 alt=7 T=257.0K p=0.4264 vmr=1.290e-03
+{'self': np.float64(0.00129), 'air': np.float64(0.99871)}
+1.807266 seconds elapsed for abscoef; nlines = 2120
+  → saved (2521009 points)
+[9/16] CH4 iso1 alt 0
+  CH4 iso1 alt=0 T=299.7K p=0.9998 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+27.179555 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+[10/16] CH4 iso1 alt 1
+  CH4 iso1 alt=1 T=293.7K p=0.8922 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+25.155736 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+[11/16] CH4 iso1 alt 2
+  CH4 iso1 alt=2 T=287.7K p=0.7945 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+23.687473 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+[12/16] CH4 iso1 alt 3
+  CH4 iso1 alt=3 T=283.7K p=0.7057 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+22.081979 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+[13/16] CH4 iso1 alt 4
+  CH4 iso1 alt=4 T=277.0K p=0.6247 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+20.989126 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+[14/16] CH4 iso1 alt 5
+  CH4 iso1 alt=5 T=270.3K p=0.5517 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+19.675267 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+[15/16] CH4 iso1 alt 6
+  CH4 iso1 alt=6 T=263.6K p=0.4856 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+18.434575 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+[16/16] CH4 iso1 alt 7
+  CH4 iso1 alt=7 T=257.0K p=0.4264 vmr=1.700e-06
+{'self': np.float64(1.7e-06), 'air': np.float64(0.9999983)}
+17.253334 seconds elapsed for abscoef; nlines = 21535
+  → saved (2521009 points)
+Done.

@@ -278,7 +278,7 @@ def main():
 
         if args.ref_therm.lower() == "thermal":
             wl_high, radiance_high = compute_thermal_emission(
-                scenario, df_atm, abs_dir, args.cloud_top, args.albedo
+                scenario, df_atm, abs_dir, args.cloud_top
             )
         else:
             wl_high, radiance_high = compute_reflectivity(
@@ -288,16 +288,16 @@ def main():
         scenario_dict = {}
         for R in args.resolutions:
             print(f"  Binning to R={R:.2e}")
-            wl_b, refl_b = bin_spectrum_robust(wl_high, radiance_high, R)
+            wl_b, rad_b = bin_spectrum_robust(wl_high, radiance_high, R)
             entry = {
                 "wavelength_grid": wl_b.astype(np.float32),
-                "reflectivity_clean": refl_b.astype(np.float32),
+                "radiance_clean": rad_b.astype(np.float32),
                 "resolution": int(R),
             }
-            for snr in args.snrs:
-                noisy, err = inject_poisson_noise(refl_b, snr)
-                entry[f"reflectivity_snr{int(snr)}"] = noisy
-                entry[f"error_snr{int(snr)}"] = err
+            # for snr in args.snrs:
+            #     noisy, err = inject_poisson_noise(rad_b, snr)
+            #     entry[f"rad_snr{int(snr)}"] = noisy
+            #     entry[f"error_snr{int(snr)}"] = err
             scenario_dict[int(R)] = entry
 
         with open(out_path, "wb") as f:
