@@ -236,8 +236,8 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
                 ppmv_avg = ppmv_col[layer_pos]
 
             vmr_avg = ppmv_avg * 1e-6
-            delta_tau_layers[layer_pos] += coef * vmr_avg * dz_cm[layer_pos]
-            # if VMR already in coef:
+            delta_tau_layers[layer_pos] += coef * vmr_avg * dz_cm[layer_pos] # 
+            # if VMR already in coef: 
             # delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos]
 
     if delta_tau_layers is None:
@@ -247,16 +247,23 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
     # tau_above[i] = optical depth from top of layer i to space
     # For bottom-up: start from surface, attenuate and add layer emission
 
-    I = planck_wn(wn_grid_ref, T_surface)  # surface / cloud emission no need for averaging here
+    n_layers, n_wn = delta_tau_layers.shape
 
-    # layers from bottom (cloud) to top
-    for i in range(n_layers):
+    # τ_above[i] = Δτ_{i+1} + Δτ_{i+2} + ... + Δτ_{n-1}
+    # compute from the top downward
+    tau_above = np.zeros_like(delta_tau_layers)
+
+    for i in range(n_layers - 2, -1, -1): #count backwards from n_layer = top to n_layer = surface
+        tau_above[i] = tau_above[i + 1] + delta_tau_layers[i + 1] # Compute the optical depth 
+
+    tau_tot = delta_tau_layers.sum(axis=0)  # (n_wn,)
+
+    I = planck_wn(wn_grid_ref, T_surface) * np.exp(-np.minimum(tau_tot, 50.0)) # This is the surface intensity
+
+    for i in range(n_layers): 
         dtau = delta_tau_layers[i]
-        # avoid overflow
-        transm = np.exp(-dtau)
-        B = planck_wn(wn_grid_ref, temps[i])
-        # I from below, attenuated through layer, plus layer emission
-        I = I * transm + B * (1.0 - transm)
+        B_i = planck_wn(wn_grid_ref, temps[i])
+        I += B_i * np.exp(-tau_above[i]) * dtau # Add this layer's emission (tau_above is the optical depth that the light from this layer must travel through!)
 
     wavelengths_um = (1e4 / wn_grid_ref).astype(np.float32)
     radiance = I.astype(np.float32)
