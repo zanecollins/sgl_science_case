@@ -244,7 +244,7 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
     for i in range(n_layers):
         dtau = delta_tau_layers[i]
         # avoid overflow
-        transm = np.exp(-np.minimum(dtau, 50.0))
+        transm = np.exp(-dtau)
         B = planck_wn(wn_grid_ref, temps[i])
         # I from below, attenuated through layer, plus layer emission
         I = I * transm + B * (1.0 - transm)
@@ -322,11 +322,16 @@ def main():
                 "radiance_clean": rad_b.astype(np.float32),
                 "resolution": int(R),
             }
-            for snr in args.snrs:
-                noisy, err = inject_poisson_noise(rad_b, snr)
-                entry[f"radiance_snr{int(snr)}"] = noisy
-                entry[f"error_snr{int(snr)}"] = err
+            
+            # for snr in args.snrs:
+            #     noisy, err = inject_poisson_noise(rad_b, snr)
+            #     entry[f"radiance_snr{int(snr)}"] = noisy
+            #     entry[f"error_snr{int(snr)}"] = err
+                
             scenario_dict[int(R)] = entry
+
+            del wl_b, rad_b, entry
+            gc.collect()
 
         with open(out_path, "wb") as f:
             pickle.dump(scenario_dict, f, protocol=pickle.HIGHEST_PROTOCOL)

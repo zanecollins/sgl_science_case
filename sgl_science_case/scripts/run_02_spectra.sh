@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=sgl_spectra_co2_iso1
-#SBATCH --mem=64G
+#SBATCH --job-name=sgl_spectra_co2_iso1_128G_nosnr
+#SBATCH --mem=128G
 #SBATCH --time=2:00:00
 #SBATCH --output=logs/spectra_co2-%j.out
 #SBATCH --error=logs/spectra_co2-%j.err
