@@ -190,7 +190,7 @@ def planck_wn(wn_cm, T):
 def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top=8.0, T_surface=None):
     """
     Simple nadir thermal emission:
-      I = B(T_surf) e^{-τ_tot} + Σ B(T_i) e^{-τ_above,i} (1 - e^{-Δτ_i})
+      I = B(T_surf) e^{-τ_tot} + Σ B(T_i) e^{-τ_above,i}
     Layers ordered from surface/cloud upward.
     """
     above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy()  # keep original index
@@ -218,6 +218,8 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
             continue
         print(f"→ {mol} iso{iso}")
 
+        ppmv_col = above_df[col_name].astype(float).values  # all layers once
+
         for layer_pos, (orig_idx, row) in enumerate(above_df.iterrows()):
             wn_grid, coef = load_abs_coef(mol, iso, orig_idx, abs_coef_dir)  # fix index if needed
             if wn_grid_ref is None:
@@ -225,9 +227,16 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
                 delta_tau_layers = np.zeros((n_layers, len(coef)), dtype=np.float64)
 
             # Match your cache convention (VMR in or out of coef)
-            ppmv = float(row[col_name])
-            vmr = ppmv * 1e-6
-            delta_tau_layers[layer_pos] += coef * vmr * dz_cm[layer_pos]
+
+            #Average the VMRs of the layers
+            if layer_pos < n_layers - 1:
+                ppmv_avg = 0.5 * (ppmv_col[layer_pos] + ppmv_col[layer_pos + 1])
+            else:
+                # topmost slab: only one interface
+                ppmv_avg = ppmv_col[layer_pos]
+
+            vmr_avg = ppmv_avg * 1e-6
+            delta_tau_layers[layer_pos] += coef * vmr_avg * dz_cm[layer_pos]
             # if VMR already in coef:
             # delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos]
 
@@ -238,7 +247,7 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
     # tau_above[i] = optical depth from top of layer i to space
     # For bottom-up: start from surface, attenuate and add layer emission
 
-    I = planck_wn(wn_grid_ref, T_surface)  # surface / cloud emission
+    I = planck_wn(wn_grid_ref, T_surface)  # surface / cloud emission no need for averaging here
 
     # layers from bottom (cloud) to top
     for i in range(n_layers):

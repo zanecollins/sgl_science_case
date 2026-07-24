@@ -47,18 +47,27 @@ def compute_absorption_coefficient(molecule, isotope, dwn, altitude_idx, df_atm,
 
     #From atmosphere profile table, retrive pressure, vmr, and temperature at input layer
     p_atm = df_atm["PRES_mb"].iloc[altitude_idx] / 1013.25
+    p_atm_below = df_atm["PRES_mb"].iloc[altitude_idx-1]/1013.25
     vmr = df_atm[f"{molecule}_iso{isotope}_ppmv"].iloc[altitude_idx] / 1e6
+    vmr_below = df_atm[f"{molecule}_iso{isotope}_ppmv"].iloc[altitude_idx - 1] / 1e6
     T = df_atm["TEMP_K"].iloc[altitude_idx]
+    T_below = df_atm["TEMP_K"].iloc[altitude_idx-1]
     print(f"  {molecule} iso{isotope} alt={altitude_idx} T={T:.1f}K p={p_atm:.4f} vmr={vmr:.3e}")
+
+    # Because the layers are separated by a finite distance, I take the average values between the layer below and the layer being computed
+
+    P_average = (p_atm + p_atm_below)/2
+    vmr_average = (vmr + vmr_below) /2
+    T_average = (T + T_below) /2
 
     #Compute absorption coefficient - this is the most computationally expensive.
     wn, coef = absorptionCoefficient_Voigt(
-        Components=[(M, isotope, vmr)],
-        Diluent={"self": vmr, "air": 1.0 - vmr},
+        Components=[(M, isotope, vmr_average)],
+        Diluent={"self": vmr_average, "air": 1.0 - vmr_average},
         SourceTables=table_name,
         WavenumberRange=(wn_min, wn_max),
         WavenumberStep=dwn,
-        Environment={"T": T, "p": p_atm},
+        Environment={"T": T_average, "p": P_average},
         HITRAN_units=False,
     )
     return wn, coef
