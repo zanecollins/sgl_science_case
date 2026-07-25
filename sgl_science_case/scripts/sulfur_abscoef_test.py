@@ -118,34 +118,23 @@ def parse_hitran_xsc(path: Path):
     return wn, xsec
 
 def find_xsc_files(xsc_dir: Path, species_token: str):
-    aliases = SPECIES_ALIASES.get(species_token.upper(), [species_token])
-    aliases = sorted({a.lower() for a in aliases}, key=len, reverse=True)
+    # case-insensitive alias lookup
+    alias_map = {k.upper(): v for k, v in SPECIES_ALIASES.items()}
+    aliases = alias_map.get(species_token.upper(), [species_token])
+    alias_stems = {a.lower() for a in aliases}
 
     files = []
     for f in sorted(xsc_dir.iterdir()):
         if not f.is_file() or f.name.startswith("._") or f.name.startswith("."):
             continue
-        name = f.name.lower()
+        name = f.name
         if not (name.endswith(".xsc") or name.endswith(".xsc.txt") or name.endswith(".txt")):
             continue
 
-        # filename stem before first "_" often is the formula
-        stem = f.name.split("_")[0]
-        if stem.lower() in {a.lower() for a in aliases}:
+        stem = name.split("_")[0]  # e.g. (C2H5O)2SO2  or  C2H6S
+        if stem.lower() in alias_stems:
             files.append(f)
 
-        for a in aliases:
-            # whole-token / stem match only
-            if stem == a or stem.startswith(a + "(") or a == stem:
-                files.append(f)
-                break
-            # allow alias if it appears as its own filename chunk
-            if re.search(rf"(^|[_\-])({re.escape(a)})([_\-]|\.|$)", name):
-                # block H2S matching CH2SH
-                if a == "h2s" and "ch2sh" in name.replace(" ", ""):
-                    continue
-                files.append(f)
-                break
     return files
 
 
@@ -210,6 +199,7 @@ def bin_spectrum_robust(wl_native, spectrum_native, R_bin):
         spectrum_native = spectrum_native[::-1]
 
     native_R = np.median(wl_native[:-1] / np.diff(wl_native))
+    # print(native_R)
     if R_bin >= 0.95 * native_R:
         return wl_native, spectrum_native
 
@@ -283,7 +273,15 @@ def main():
             del wl_b, y_b
             gc.collect()
 
-        safe = name.replace("/", "_").replace(" ", "")
+                # short names for big combinations
+        if name.count("+") >= 3:
+            if name.startswith("DMS+"):
+                safe = "ALL_SULFUR_WITH_DMS"
+            else:
+                safe = "ALL_SULFUR_NO_DMS"
+        else:
+            safe = name.replace("/", "_").replace(" ", "")
+
         out_path = out_dir / f"{safe}.pkl"
         with open(out_path, "wb") as f:
             pickle.dump(scenario_dict, f, protocol=pickle.HIGHEST_PROTOCOL)

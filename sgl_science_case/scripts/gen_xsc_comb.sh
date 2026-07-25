@@ -13,8 +13,8 @@ SCRIPT="${SCRIPT:-scripts/sulfur_abscoef_test.py}"
 WL_MIN="${WL_MIN:-}"
 WL_MAX="${WL_MAX:-}"
 
-RESOLUTIONS=(1000 10000 10000 20000)
-SNRS=(5 10 25 50)
+RESOLUTIONS=(1000 10000 25000 50000 120337)
+SNRS=(5 10 25 50 100 200 500)
 
 # All sulfur XSC species from HITRAN list except SO2 and SF5CF3
 SPECIES=(
@@ -28,10 +28,8 @@ SPECIES=(
 )
 
 COMBINE=(
-  "DMS+CS2+SF6+Methanethiol+DMSO"
-  "CS2+SF6+Methanethiol+DMSO"
-  "DMS+DMDS+CS2+SF6"
-  "DMDS+CS2+SF6"
+  "DMS+DiethylSulfate+Tetrahydrothiophene+2-Propanethiol+2-Methyl-1-propanethiol+tert-Butylmercaptan+DiethylSulfide+MethylIsothiocyanate+DimethylSulfate+DMSO+PropyleneSulfide+Thiophene+Cyclohexanethiol+Benzenethiol+Thiophosgene+PerchloromethylMercaptan+EthyleneSulfide+1-Propanethiol+EthylMercaptan+MethanesulfonylChloride+Methanethiol+CS2+Thioglycol+SF6+SO2Cl2+SO2F2+SOF2+SPCl3"
+  "DiethylSulfate+Tetrahydrothiophene+2-Propanethiol+2-Methyl-1-propanethiol+tert-Butylmercaptan+DiethylSulfide+MethylIsothiocyanate+DimethylSulfate+DMSO+PropyleneSulfide+Thiophene+Cyclohexanethiol+Benzenethiol+Thiophosgene+PerchloromethylMercaptan+EthyleneSulfide+1-Propanethiol+EthylMercaptan+MethanesulfonylChloride+Methanethiol+CS2+Thioglycol+SF6+SO2Cl2+SO2F2+SOF2+SPCl3"
 )
 
 mkdir -p "$OUT_DIR"
