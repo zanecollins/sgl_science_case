@@ -95,43 +95,23 @@ def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
 
     return wl_binned, spectrum_binned
 
-def inject_poisson_noise(trans, snr, seed=42, mode='gaussian_approx'):
+def inject_poisson_noise(spec, snr, seed=42, mode='gaussian_approx'):
 
     """
-    Inject noise into a transmission or reflectivity spectrum.
+    Inject noise into a radiative spectrum.
     
     Parameters:
         signal: array of transmission or reflectivity (0 to 1)
         snr: desired signal-to-noise ratio (scalar or per-bin array)
         mode: 'gaussian_approx' (recommended) or 'true_poisson'
     """
-    np.random.seed(seed)
-    
-    signal = 1 - trans
 
-    if mode == 'gaussian_approx':
-        # Most common approach for spectra
-        noise_std = signal / snr          # relative noise
-        noise = np.random.normal(0, noise_std)
-        noisy = trans + noise
-        errorbars = noise_std
-        
-    elif mode == 'true_poisson':
-        # True Poisson if you have absolute photon counts
-        # Assume max_signal corresponds to e.g. 1e6 photons
-        max_counts = 1e9                   # SGL high photon count!!
-        counts = signal * max_counts
-        noisy_counts = np.random.poisson(counts)
-        noisy = noisy_counts / max_counts 
-        errorbars = np.sqrt(counts) / max_counts   # sqrt(N) / N0
+    spec = np.asarray(spec, dtype=float)
+    continuum = np.nanmedian(spec)
+    noise_std = continuum / snr
+    noisy = spec + np.random.normal(0.0, noise_std, size=spec.shape)
     
-    else:
-        raise ValueError("mode must be 'gaussian_approx' or 'true_poisson'")
-    
-    # Clip to physical range
-    noisy = np.clip(noisy, 0.0, 1.0)
-    
-    return noisy, errorbars
+    return noisy, np.full_like(spec, noise_std)
 
 def compute_reflectivity(scenario, df_atm, abs_coef_dir, cloud_top, albedo):
     """scenario: list of (mol, iso)"""
@@ -247,6 +227,9 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
     # tau_above[i] = optical depth from top of layer i to space
     # For bottom-up: start from surface, attenuate and add layer emission
 
+    #Test: black body behavior
+
+
     n_layers, n_wn = delta_tau_layers.shape
 
     # τ_above[i] = Δτ_{i+1} + Δτ_{i+2} + ... + Δτ_{n-1}
@@ -339,10 +322,10 @@ def main():
                 "resolution": int(R),
             }
             
-            # for snr in args.snrs:
-            #     noisy, err = inject_poisson_noise(rad_b, snr)
-            #     entry[f"radiance_snr{int(snr)}"] = noisy
-            #     entry[f"error_snr{int(snr)}"] = err
+            for snr in args.snrs:
+                noisy, err = inject_poisson_noise(rad_b, snr)
+                entry[f"radiance_snr{int(snr)}"] = noisy
+                entry[f"error_snr{int(snr)}"] = err
                 
             scenario_dict[int(R)] = entry
 
