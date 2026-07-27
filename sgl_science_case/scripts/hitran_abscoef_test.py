@@ -26,6 +26,10 @@ from scipy.interpolate import interp1d
 
 # Map friendly names -> tokens that appear in HITRAN filenames
 SPECIES_ALIASES = {
+    # Hydrocarbons
+
+
+    # Sulfur Containing
     "DMS": ["C2H6S"],
     "DMDS": ["C2H6S2"],
     "DiethylSulfate": ["(C2H5O)2SO2"],
@@ -55,6 +59,28 @@ SPECIES_ALIASES = {
     "SO2F2": ["SO2F2"],
     "SOF2": ["SOF2"],
     "SPCl3": ["SPCl3"],
+
+    # Target
+    "Isoprene": ["C5-H8", "C5H8"],
+
+    # Close confusers / biogenics
+    "Butadiene": ["C4H6"],          # 1,3-butadiene
+    "Propene": ["C3H6"],
+    "Butene": ["C4H8"],              # C4H8 isomer files (1-butene / 2-butene / isobutene — same stem)
+    "1-Butyne": ["HC=CCH2CH3", "HCCCH2CH3"],
+
+    # Monoterpenes (C10H16) — same formula, different files
+    "Limonene": ["C10H16", "C10-H16"],
+    "Pinene": ["C10H16", "C10-H16"],   # if you only have formula stems, both share these
+
+    # Aromatics
+    "Benzene": ["C6H6"],
+    "Toluene": ["C6H5CH3"],
+    "Trimethylbenzene": ["C6H3(CH3)3"],
+    "Tetramethylbenzene": ["(C6H2)(CH3)4"],
+
+    # Longer alkene
+    "1-Decene": ["CH2CH(CH2)7CH3"],
 }
 
 
@@ -275,10 +301,10 @@ def main():
 
                 # short names for big combinations
         if name.count("+") >= 3:
-            if name.startswith("DMS+"):
-                safe = "ALL_SULFUR_WITH_DMS"
+            if name.startswith("Isoprene+"):
+                safe = "ALL_WITH_ISOPRENE"
             else:
-                safe = "ALL_SULFUR_NO_DMS"
+                safe = "ALL_WITHOUT_ISOPRENE"
         else:
             safe = name.replace("/", "_").replace(" ", "")
 
