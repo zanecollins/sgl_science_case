@@ -303,12 +303,12 @@ def planck_wn(wn_cm, T):
     return c1 * wn**3 / np.expm1(x)
 
 def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top=0.0, T_surface=None):
-    above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy().reset_index(drop=True)
+    above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy().reset_index(drop=True) # From the dataframe of Temperature, Pressure, and VMRs of molecules at Altitude, take the values above input cloud top altitude
     print(f"Computing thermal emission above {cloud_top} km ({len(above_df)} layers)")
 
     alt_km = above_df["ALT_km"].values
     dz_km = np.diff(alt_km, append=alt_km[-1] + np.median(np.diff(alt_km)))
-    dz_cm = dz_km * 1e5
+    dz_cm = dz_km * 1e5 # Convert from km layer width to cm
     temps = above_df["TEMP_K"].values
     density = above_df["DENSITY_cm3"].astype(float).values
 
@@ -318,10 +318,10 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
     # --- 1) load all XSCs ---
     raw = {}
     for mol, iso in molecules_isotopes:
-        wn, coef = load_abs_coef(mol, iso, 0, abs_coef_dir)
+        wn, coef = load_abs_coef(mol, iso, 0, abs_coef_dir) # Returns (wn, sigma) from HITRAN XSC [cm^2 / molecule]
         raw[mol] = (wn, coef)
 
-    # --- 2) common overlapping grid ---
+    # --- 2) common overlapping grid (take only the range of wavenumbers that have overlap with all molecule cross sections)---
     wn_min = max(wn.min() for wn, _ in raw.values())
     wn_max = min(wn.max() for wn, _ in raw.values())
     n_grid = int(min(200_000, max(20_000, (wn_max - wn_min) / 0.05)))
@@ -334,16 +334,17 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
 
     # --- 3) Δτ on common grid ---
     n_layers = len(above_df)
-    delta_tau_layers = np.zeros((n_layers, len(wn_grid_ref)), dtype=np.float64)
+    delta_tau_layers = np.zeros((n_layers, len(wn_grid_ref)))
 
     for mol, iso in molecules_isotopes:
-        col = f"{mol}_ppmv"   # or f"{mol}_iso{iso}_ppmv" if that's what you use
+        col = f"{mol}_ppmv"   # take column of VMR for molecule {mol}
         if col not in above_df.columns:
             print(f"ERROR: missing {col}")
             continue
         ppmv_col = above_df[col].astype(float).values
         sigma = xsec[mol]
 
+        # This block takes the average between the two adjacent layers
         for i in range(n_layers):
             if i < n_layers - 1:
                 ppmv_avg = 0.5 * (ppmv_col[i] + ppmv_col[i + 1])
@@ -353,17 +354,17 @@ def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top
                 n_avg = density[i]
             vmr = ppmv_avg * 1e-6
             # σ [cm²] * n [cm⁻³] * VMR * dz [cm]
-            delta_tau_layers[i] += sigma * n_avg * vmr * dz_cm[i]
+            delta_tau_layers[i] += sigma * n_avg * vmr * dz_cm[i] # For this layer, add the optical depth from each molecule
 
     # --- 4) thermal sum (same as before) ---
     tau_above = np.zeros_like(delta_tau_layers)
-    for i in range(n_layers - 2, -1, -1):
+    for i in range(n_layers - 2, -1, -1): # Computes the optical depth above each layer
         tau_above[i] = tau_above[i + 1] + delta_tau_layers[i + 1]
 
-    tau_tot = delta_tau_layers.sum(axis=0)
-    I = planck_wn(wn_grid_ref, T_surface) * np.exp(-np.minimum(tau_tot, 50.0))
-    for i in range(n_layers):
-        I += planck_wn(wn_grid_ref, temps[i]) * np.exp(-np.minimum(tau_above[i], 50.0)) * delta_tau_layers[i]
+    tau_tot = delta_tau_layers.sum(axis=0)#Compute total optical depth
+    I = planck_wn(wn_grid_ref, T_surface) * np.exp(-np.minimum(tau_tot, 50.0)) #Surface intensity contribution
+    for i in range(n_layers): #Second term in derived intensity (derived with Sara): I_\lambda = B(T_\text{Surface})\cdot e^{-\tau_\text{tot}} + \sum_i^{N} B(T_i) e^{-\tau_\text{i}} \cdot\Delta \tau
+        I += planck_wn(wn_grid_ref, temps[i]) * np.exp(-tau_above[i],) * delta_tau_layers[i]
 
     wl = (1e4 / wn_grid_ref).astype(np.float32)
     order = np.argsort(wl)
