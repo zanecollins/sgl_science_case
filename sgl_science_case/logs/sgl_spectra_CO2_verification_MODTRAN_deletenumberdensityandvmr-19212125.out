@@ -1,0 +1,17 @@
+
+=== Scenario CO2:1 ===
+Computing thermal emission above 0.0 km (50 layers)
+→ CO2 iso1
+Radiance range: 3.528e+01 – 1.535e+02
+tau_tot: min/med/max 3.735036802385978e-09 1.5416813308886417e-05 39.55389479036605
+frac tau>1 0.0120999758000484
+frac tau>10 0.0014499971000058
+radiance min/max 35.27536 153.47253
+  Binning to R=1.00e+02
+  Binning to R=1.00e+03
+  Binning to R=1.00e+04
+  Binning to R=1.00e+05
+  Binning to R=5.00e+05
+  Saved → /home/zaniacco/orcd/pool/sgl_science_case/spectra_dict_cache_dwn1e-3_CO2/CO2:1.pkl
+
+All scenarios done.

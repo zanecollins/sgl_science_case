@@ -1,0 +1,13 @@
+
+=== Scenario CO2:1 ===
+Computing thermal emission above 0.0 km (50 layers)
+→ CO2 iso1
+Radiance range: 3.928e+00 – 3.119e+02
+  Binning to R=1.00e+02
+  Binning to R=1.00e+03
+  Binning to R=1.00e+04
+  Binning to R=1.00e+05
+  Binning to R=5.00e+05
+  Saved → /home/zaniacco/orcd/pool/sgl_science_case/spectra_dict_cache_dwn1e-3_CO2/CO2:1.pkl
+
+All scenarios done.

@@ -20,7 +20,66 @@ import argparse, gc, os, pickle
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import re
 from scipy.interpolate import interp1d
+
+SPECIES_ALIASES = {
+    # Hydrocarbons
+
+
+    # Sulfur Containing
+    "DMS": ["C2H6S"],
+    "DMDS": ["C2H6S2"],
+    "DiethylSulfate": ["(C2H5O)2SO2"],
+    "Tetrahydrothiophene": ["(CH2)4S"],
+    "2-Propanethiol": ["(CH3)2CH(HS)"],
+    "2-Methyl-1-propanethiol": ["(CH3)2CHCH2SH"],
+    "tert-Butylmercaptan": ["(CH3)3CSH"],
+    "DiethylSulfide": ["(CH3CH2)2S"],
+    "MethylIsothiocyanate": ["C2H3NS"],
+    "DimethylSulfate": ["C2H6O4S"],
+    "DMSO": ["C2H6OS"],
+    "PropyleneSulfide": ["C3H6S"],
+    "Thiophene": ["C4H4S"],
+    "Cyclohexanethiol": ["C6H11SH"],
+    "Benzenethiol": ["C6H5SH"],
+    "Thiophosgene": ["CCl2S"],
+    "PerchloromethylMercaptan": ["CCl3SCl"],
+    "EthyleneSulfide": ["CH2CH2S"],
+    "1-Propanethiol": ["CH3(CH2)2SH"],
+    "EthylMercaptan": ["CH3CH2SH"],
+    "MethanesulfonylChloride": ["CH3SO2Cl"],
+    "Methanethiol": ["CH4S"],
+    "CS2": ["CS2"],
+    "Thioglycol": ["HS(CH2)2OH"],
+    "SF6": ["SF6"],
+    "SO2Cl2": ["SO2Cl2"],
+    "SO2F2": ["SO2F2"],
+    "SOF2": ["SOF2"],
+    "SPCl3": ["SPCl3"],
+
+    # Target
+    "Isoprene": ["C5-H8", "C5H8"],
+
+    # Close confusers / biogenics
+    "Butadiene": ["C4H6"],          # 1,3-butadiene
+    "Propene": ["C3H6"],
+    "Butene": ["C4H8"],              # C4H8 isomer files (1-butene / 2-butene / isobutene — same stem)
+    "1-Butyne": ["HC=CCH2CH3", "HCCCH2CH3"],
+
+    # Monoterpenes (C10H16) — same formula, different files
+    "Limonene": ["C10H16", "C10-H16"],
+    "Pinene": ["C10H16", "C10-H16"],   # if you only have formula stems, both share these
+
+    # Aromatics
+    "Benzene": ["C6H6"],
+    "Toluene": ["C6H5CH3"],
+    "Trimethylbenzene": ["C6H3(CH3)3"],
+    "Tetramethylbenzene": ["(C6H2)(CH3)4"],
+
+    # Longer alkene
+    "1-Decene": ["CH2CH(CH2)7CH3"],
+}
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -36,18 +95,74 @@ def parse_args():
                    help="e.g. H2O+CH4  H2O+CH4+N2O")
     return p.parse_args()
 
+def parse_hitran_xsc(path: Path):
+    lines = path.read_text(errors="replace").splitlines()
+    floats = []
+    for tok in lines[0].split():
+        try:
+            floats.append(float(tok))
+        except ValueError:
+            continue
+        if len(floats) >= 3:
+            break
+    numin, numax, npoints = floats[0], floats[1], int(floats[2])
+
+    vals = []
+    for line in lines[1:]:
+        for tok in line.split():
+            try:
+                vals.append(float(tok))
+            except ValueError:
+                pass
+    xsec = np.asarray(vals[:npoints], dtype=np.float64)
+    wn = np.linspace(numin, numax, npoints)
+    return wn, xsec
+
+
+def find_xsc_file(xsc_dir: Path, mol: str) -> Path:
+    alias_map = {k.upper(): v for k, v in SPECIES_ALIASES.items()}
+    stems = {a.lower() for a in alias_map.get(mol.upper(), [mol])}
+
+    matches = []
+    for f in sorted(Path(xsc_dir).iterdir()):
+        if f.name.startswith("._") or not f.is_file():
+            continue
+        if not (f.name.endswith(".txt") or f.name.endswith(".xsc")):
+            continue
+        if f.name.split("_")[0].lower() in stems:
+            matches.append(f)
+    if not matches:
+        raise FileNotFoundError(f"No XSC for {mol!r} in {xsc_dir}")
+
+    def score(p):
+        m = re.search(r"(\d+\.?\d*)K", p.name)
+        return abs(float(m.group(1)) - 298.0) if m else 999.0
+    return sorted(matches, key=score)[0]
+
+
+# module-level cache so each molecule is read once
+_XSEC_CACHE = {}
+
 def load_abs_coef(mol, iso, alt, cache_dir):
-    path = Path(cache_dir) / f"{mol}_iso{iso}_alt{alt:03d}.npz"
-    data = np.load(path)
-    return data["wn"], data["coef"]
+    """
+    Drop-in replacement: ignore iso and alt.
+    Returns (wn, sigma) from HITRAN XSC [cm^2 / molecule], single T.
+    """
+    key = mol.upper()
+    if key not in _XSEC_CACHE:
+        path = find_xsc_file(Path(cache_dir), mol)
+        wn, xsec = parse_hitran_xsc(path)
+        _XSEC_CACHE[key] = (wn, xsec)
+        print(f"Loaded XSC {mol}: {path.name}")
+    return _XSEC_CACHE[key]
 
 def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
     """
     Robust flux-conserving-ish rebinning for extremely large native grids.
     Avoids SpectRes entirely.
     """
-    # if err_data is None:
-    #     err_data = []
+    if err_data is None:
+        err_data = []
 
     wl_native = np.asarray(wl_native, dtype=np.float64)
     spectrum_native = np.asarray(spectrum_native, dtype=np.float64)
@@ -56,8 +171,8 @@ def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
     if wl_native[0] > wl_native[-1]:
         wl_native = wl_native[::-1]
         spectrum_native = spectrum_native[::-1]
-        # if len(err_data) > 0:
-        #     err_data = np.asarray(err_data)[::-1]
+        if len(err_data) > 0:
+            err_data = np.asarray(err_data)[::-1]
 
     # Native resolving power (approximate)
     native_R = np.median(wl_native[:-1] / np.diff(wl_native))
@@ -65,9 +180,9 @@ def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
     # If requested R is close to or higher than native, just return native
     if R_bin >= 0.95 * native_R:
         print(f"Requested R={R_bin:.2e} ≥ native R≈{native_R:.2e} → returning native grid")
-        # if len(err_data) > 0:
-        #     return wl_native, spectrum_native, np.asarray(err_data)
-        return wl_native, spectrum_native #, None
+        if len(err_data) > 0:
+            return wl_native, spectrum_native#, np.asarray(err_data)
+        return wl_native, spectrum_native#, None
 
     # Build new wavelength grid at constant R
     log_wl_min = np.log(wl_native[0])
@@ -87,11 +202,11 @@ def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
                       bounds_error=False, fill_value='extrapolate')
     spectrum_binned = interp(wl_binned)
 
-    # if len(err_data) > 0:
-    #     err_interp = interp1d(wl_native, err_data, kind='linear',
-    #                           bounds_error=False, fill_value='extrapolate')
-    #     err_binned = err_interp(wl_binned)
-    #     return wl_binned, spectrum_binned, err_binned
+    if len(err_data) > 0:
+        err_interp = interp1d(wl_native, err_data, kind='linear',
+                              bounds_error=False, fill_value='extrapolate')
+        err_binned = err_interp(wl_binned)
+        return wl_binned, spectrum_binned, err_binned
 
     return wl_binned, spectrum_binned
 
@@ -187,97 +302,73 @@ def planck_wn(wn_cm, T):
     # stable for large x
     return c1 * wn**3 / np.expm1(x)
 
-def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top=8.0, T_surface=None):
-    """
-    Simple nadir thermal emission:
-      I = B(T_surf) e^{-τ_tot} + Σ B(T_i)e^{-τ_above,i}(1-e^{-τ_i})
-    Layers ordered from surface/cloud upward.
-    """
-    above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy()  # keep original index
-
+def compute_thermal_emission(molecules_isotopes, df_atm, abs_coef_dir, cloud_top=0.0, T_surface=None):
+    above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy().reset_index(drop=True) # From the dataframe of Temperature, Pressure, and VMRs of molecules at Altitude, take the values above input cloud top altitude
     print(f"Computing thermal emission above {cloud_top} km ({len(above_df)} layers)")
 
     alt_km = above_df["ALT_km"].values
     dz_km = np.diff(alt_km, append=alt_km[-1] + np.median(np.diff(alt_km)))
-    dz_cm = dz_km * 1e5
+    dz_cm = dz_km * 1e5 # Convert from km layer width to cm
     temps = above_df["TEMP_K"].values
     density = above_df["DENSITY_cm3"].astype(float).values
 
-    # Surface/cloud temperature
     if T_surface is None:
-        T_surface = float(temps[0])  # cloud-top temperature
+        T_surface = float(temps[0])
 
-    # --- accumulate per-layer delta_tau (sum over molecules) ---
-    delta_tau_layers = None  # shape (n_layers, n_wn)
-    wn_grid_ref = None
-
-    n_layers = len(above_df)
+    # --- 1) load all XSCs ---
+    raw = {}
     for mol, iso in molecules_isotopes:
-        col_name = f"{mol}_iso{iso}_ppmv"
-        if col_name not in df_atm.columns:
-            print(f"ERROR: missing {col_name}")
+        wn, coef = load_abs_coef(mol, iso, 0, abs_coef_dir) # Returns (wn, sigma) from HITRAN XSC [cm^2 / molecule]
+        raw[mol] = (wn, coef)
+
+    # --- 2) common overlapping grid (take only the range of wavenumbers that have overlap with all molecule cross sections)---
+    wn_min = max(wn.min() for wn, _ in raw.values())
+    wn_max = min(wn.max() for wn, _ in raw.values())
+    n_grid = int(min(200_000, max(20_000, (wn_max - wn_min) / 0.05)))
+    wn_grid_ref = np.linspace(wn_min, wn_max, n_grid)
+
+    xsec = {}
+    for mol, (wn, coef) in raw.items():
+        xsec[mol] = interp1d(wn, coef, kind="linear",
+                             bounds_error=False, fill_value=0.0)(wn_grid_ref)
+
+    # --- 3) Δτ on common grid ---
+    n_layers = len(above_df)
+    delta_tau_layers = np.zeros((n_layers, len(wn_grid_ref)))
+
+    for mol, iso in molecules_isotopes:
+        col = f"{mol}_ppmv"   # take column of VMR for molecule {mol}
+        if col not in above_df.columns:
+            print(f"ERROR: missing {col}")
             continue
-        print(f"→ {mol} iso{iso}")
+        ppmv_col = above_df[col].astype(float).values
+        sigma = xsec[mol]
 
-        ppmv_col = above_df[col_name].astype(float).values  # all layers once
-
-        for layer_pos, (orig_idx, row) in enumerate(above_df.iterrows()):
-            wn_grid, coef = load_abs_coef(mol, iso, orig_idx, abs_coef_dir)  # fix index if needed
-            if wn_grid_ref is None:
-                wn_grid_ref = wn_grid
-                delta_tau_layers = np.zeros((n_layers, len(coef)), dtype=np.float64)
-
-            # Match your cache convention (VMR in or out of coef)
-
-            #Average the VMRs of the layers
-            if layer_pos < n_layers - 1:
-                ppmv_avg = 0.5 * (ppmv_col[layer_pos] + ppmv_col[layer_pos + 1])
-                n_avg = 0.5 * (density[layer_pos] + density[layer_pos + 1])
+        # This block takes the average between the two adjacent layers
+        for i in range(n_layers):
+            if i < n_layers - 1:
+                ppmv_avg = 0.5 * (ppmv_col[i] + ppmv_col[i + 1])
+                n_avg = 0.5 * (density[i] + density[i + 1])
             else:
-                ppmv_avg = ppmv_col[layer_pos]
-                n_avg = density[layer_pos]
+                ppmv_avg = ppmv_col[i]
+                n_avg = density[i]
+            vmr = ppmv_avg * 1e-6
+            # σ [cm²] * n [cm⁻³] * VMR * dz [cm]
+            delta_tau_layers[i] += sigma * n_avg * vmr * dz_cm[i] # For this layer, add the optical depth from each molecule
 
-            vmr_avg = ppmv_avg * 1e-6
-            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos]* vmr_avg
-            # if VMR already in coef: 
-            # delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos]
-
-    if delta_tau_layers is None:
-        raise ValueError("No tau accumulated")
-
-    # --- thermal RT: surface + layers, bottom → top ---
-    # tau_above[i] = optical depth from top of layer i to space
-    # For bottom-up: start from surface, attenuate and add layer emission
-
-    n_layers, n_wn = delta_tau_layers.shape
-
-    # τ_above[i] = Δτ_{i+1} + Δτ_{i+2} + ... + Δτ_{n-1}
-    # compute from the top downward
+    # --- 4) thermal sum (same as before) ---
     tau_above = np.zeros_like(delta_tau_layers)
+    for i in range(n_layers - 2, -1, -1): # Computes the optical depth above each layer
+        tau_above[i] = tau_above[i + 1] + delta_tau_layers[i + 1]
 
-    for i in range(n_layers - 2, -1, -1): #count backwards from n_layer = top to n_layer = surface
-        tau_above[i] = tau_above[i + 1] + delta_tau_layers[i + 1] # Compute the optical depth 
+    tau_tot = delta_tau_layers.sum(axis=0)#Compute total optical depth
+    I = planck_wn(wn_grid_ref, T_surface) * np.exp(-np.minimum(tau_tot, 50.0)) #Surface intensity contribution
+    for i in range(n_layers): #Second term in derived intensity (derived with Sara): I_\lambda = B(T_\text{Surface})\cdot e^{-\tau_\text{tot}} + \sum_i^{N} B(T_i) e^{-\tau_\text{i}} \cdot\Delta \tau
+        I += planck_wn(wn_grid_ref, temps[i]) * np.exp(-tau_above[i],) * (1-delta_tau_layers[i])
 
-    tau_tot = delta_tau_layers.sum(axis=0)  # (n_wn,)
-
-    I = planck_wn(wn_grid_ref, T_surface) * np.exp(-np.minimum(tau_tot, 50.0)) # This is the surface intensity
-
-    for i in range(n_layers): 
-        dtau = delta_tau_layers[i]
-        B_i = planck_wn(wn_grid_ref, temps[i])
-        I += B_i * np.exp(-tau_above[i]) *(1- np.exp(-dtau)) # Add this layer's emission (tau_above is the optical depth that the light from this layer must travel through!)
-
-    wavelengths_um = (1e4 / wn_grid_ref).astype(np.float32)
-    radiance = I.astype(np.float32)
-
-    print(f"Radiance range: {radiance.min():.3e} – {radiance.max():.3e}")
-    
-    print("tau_tot: min/med/max", tau_tot.min(), np.median(tau_tot), tau_tot.max())
-    print("frac tau>1", np.mean(tau_tot > 1))
-    print("frac tau>10", np.mean(tau_tot > 10))
-    print("radiance min/max", radiance.min(), radiance.max())
-    
-    return wavelengths_um, radiance
+    wl = (1e4 / wn_grid_ref).astype(np.float32)
+    order = np.argsort(wl)
+    return wl[order], I[order].astype(np.float32)
 
 def parse_scenario(s: str):
     """
@@ -365,9 +456,6 @@ def main():
         gc.collect()
 
     print("\nAll scenarios done.")
-    
-    wn, coef = load_abs_coef("CO2", 1, 0, abs_dir)
-    # print(coef.min(), coef.max(), np.median(coef))
 
 if __name__ == "__main__":
     main()
