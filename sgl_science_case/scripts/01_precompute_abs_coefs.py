@@ -70,6 +70,8 @@ def compute_absorption_coefficient(molecule, isotope, dwn, altitude_idx, df_atm,
         Environment={"T": T_average, "p": P_average},
         HITRAN_units=False,
     )
+    
+    
     return wn, coef
 
 def ensure_tables(molecules_isotopes, wn_min, wn_max, hapi_db):
@@ -118,6 +120,7 @@ def main():
     for i, (mol, iso, alt) in enumerate(tasks, 1):
         print(f"[{i}/{len(tasks)}] {mol} iso{iso} alt {alt}")
         wn, coef = compute_absorption_coefficient(mol, iso, args.dwn, alt, df_atm, wn_min, wn_max)
+        print(f"Molecule {mol} iso{iso} alt{alt} min/max/mean: {np.min(coef)}/{np.max(coef)}/{np.mean(coef)}")
         np.savez_compressed(out_dir / f"{mol}_iso{iso}_alt{alt:03d}.npz",
                             wn=wn.astype(np.float32), coef=coef.astype(np.float32))
         print(f"  → saved ({len(wn)} points)")

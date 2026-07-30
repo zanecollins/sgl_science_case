@@ -16,7 +16,7 @@ python scripts/01_precompute_abs_coefs.py \
   --hapi-db ~/sgl_science_case/sgl_science_case/notebooks/HAPI_DB \
   --out-dir ~/orcd/pool/sgl_science_case/abs_coef_cache_dwn1e-3_carbon \
   --dwn 1e-3 \
-  --wl-min 10 \
-  --wl-max 20 \
+  --wl-min 13.5 \
+  --wl-max 17 \
   --cloud-top 0 \
   --molecules  CO2:1
