@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 import re
+import time
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -72,6 +73,25 @@ def parse_hitran_xsc(path: Path):
 # filename stems for isoprene
 XSC_ALIASES = {
     "Isoprene": ["C5-H8", "C5H8", "isoprene"],
+    
+    # Close confusers / biogenics
+    "Butadiene": ["C4H6"],          # 1,3-butadiene
+    "Propene": ["C3H6"],
+    "Butene": ["C4H8"],              # C4H8 isomer files (1-butene / 2-butene / isobutene — same stem)
+    "1-Butyne": ["HC=CCH2CH3", "HCCCH2CH3"],
+
+    # Monoterpenes (C10H16) — same formula, different files
+    "Limonene": ["C10H16", "C10-H16"],
+    "Pinene": ["C10H16", "C10-H16"],   # if you only have formula stems, both share these
+
+    # Aromatics
+    "Benzene": ["C6H6"],
+    "Toluene": ["C6H5CH3"],
+    "Trimethylbenzene": ["C6H3(CH3)3"],
+    "Tetramethylbenzene": ["(C6H2)(CH3)4"],
+
+    # Longer alkene
+    "1-Decene": ["CH2CH(CH2)7CH3"],
 }
 
 
@@ -225,47 +245,6 @@ def inject_poisson_noise(signal, snr, seed=42, mode="gaussian_approx"):
 
     return noisy.astype(np.float32), errorbars.astype(np.float32)
 
-def compute_reflectivity(scenario, df_atm, abs_coef_dir, cloud_top, albedo):
-    """scenario: list of (mol, iso)"""
-    above = df_atm[df_atm["ALT_km"] >= cloud_top].reset_index(drop=True)
-
-    alt_km = above["ALT_km"].values
-    dz_km = np.diff(alt_km, append=alt_km[-1] + np.median(np.diff(alt_km)))
-    dz_cm = dz_km * 1e5
-
-    total_tau = None
-    wn_ref = None
-
-    for mol, iso in scenario:
-        col = f"{mol}_ppmv"
-        if col not in df_atm.columns:
-            raise KeyError(f"Missing column {col}")
-        print(f"  → {mol} iso{iso}")
-        for layer_pos, (orig_idx, row) in enumerate(above.iterrows()):
-            wn, coef = load_abs_coef(mol, iso, orig_idx+8, abs_coef_dir)
-            if wn_ref is None:
-                wn_ref = wn
-                
-            # coef doesnt? include vmr already?
-            # ppmv = float(row[col])
-            # vmr = ppmv * 1e-6
-            
-            delta_tau = coef * dz_cm[layer_pos] #* vmr
-
-            ppmv = float(row[col])
-            vmr = ppmv * 1e-6
-            delta_tau = coef * vmr 
-            if total_tau is None:
-                total_tau = np.zeros_like(coef, dtype=np.float64)
-            total_tau += delta_tau
-
-    tau_rt = 2.0 * total_tau
-    transmission = np.exp(-tau_rt)
-    reflectivity = (transmission).astype(np.float32)
-    wavelengths = (1e4 / wn_ref).astype(np.float32)
-    print(f"  max tau_rt={np.max(tau_rt):.3f}  refl range {reflectivity.min():.4f}–{reflectivity.max():.4f}")
-    return wavelengths, reflectivity
-
 def planck_wn(wn_cm, T):
     """Planck function in wavenumber units [wn in cm^-1, T in K].
     Returns B_wn in erg/s/cm^2/sr/cm^-1 (cgs). Scale is arbitrary for template matching.
@@ -292,9 +271,10 @@ def compute_thermal_emission(
         xsc_species = []
     xsc_set = {s.upper() for s in xsc_species}
 
+    t0 = time.time()
     above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy()
-    print(f"Computing thermal emission above {cloud_top} km ({len(above_df)} layers)")
-
+    print(f"Computing thermal emission above {cloud_top} km ({len(above_df)} layers)", flush = True)
+    
     alt_km = above_df["ALT_km"].values
     dz_km = np.diff(alt_km, append=alt_km[-1] + np.median(np.diff(alt_km)))
     dz_cm = dz_km * 1e5
@@ -314,6 +294,7 @@ def compute_thermal_emission(
 
     for mol, iso in lbl_species:
         col_name = f"{mol}_iso{iso}_ppmv"
+        t_mol = time.time()
         if col_name not in df_atm.columns:
             print(f"ERROR: missing {col_name}")
             continue
@@ -329,12 +310,22 @@ def compute_thermal_emission(
             else:
                 ppmv_avg = ppmv_col[layer_pos]
             vmr_avg = ppmv_avg * 1e-6
+            
+            if layer_pos % 10 == 0 or layer_pos == n_layers - 1:
+                print(
+                    f"  layer {layer_pos+1}/{n_layers}  alt={above_df['ALT_km'].iloc[layer_pos]:.1f} km  "
+                    f"elapsed={time.time()-t_mol:.1f}s",
+                    flush=True,
+                )
+                
             # HAPI coef in cm^-1 style (your working CO2 convention)
             delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos] #* vmr_avg
+            
 
     if delta_tau_layers is None:
         raise ValueError("No LBL tau accumulated — need at least one LBL species to set the grid")
 
+        
     # --- isothermal XSC species (e.g. isoprene) ---
     if xsc_only and not xsc_dir:
         raise ValueError(f"XSC species {xsc_only} requested but --xsc-dir not set")
@@ -406,6 +397,8 @@ def main():
     xsc_species = list(getattr(args, "xsc_species", []) or [])
 
     df_atm = pd.read_csv(args.atmosphere)
+    
+    t_sc = time.time()
 
     for scen_str in args.scenarios:
         scenario = parse_scenario(scen_str)
@@ -432,6 +425,8 @@ def main():
                 args.cloud_top,
                 args.albedo,
             )
+            
+            print(f"High-res spectrum done in {time.time()-t_sc:.1f}s  N={len(wl_high)}", flush=True)
 
         scenario_dict = {}
         for R in args.resolutions:
@@ -443,10 +438,10 @@ def main():
                 "resolution": int(R),
             }
             # Optional noise:
-            # for snr in args.snrs:
-            #     noisy, err = inject_poisson_noise(rad_b, snr)
-            #     entry[f"radiance_snr{int(snr)}"] = noisy
-            #     entry[f"error_snr{int(snr)}"] = err
+            for snr in args.snrs:
+                noisy, err = inject_poisson_noise(rad_b, snr)
+                entry[f"radiance_snr{int(snr)}"] = noisy
+                entry[f"error_snr{int(snr)}"] = err
 
             scenario_dict[int(R)] = entry
             del wl_b, rad_b, entry
