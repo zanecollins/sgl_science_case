@@ -1,0 +1,82 @@
+
+=== Scenario H2O+CH4+CO2+N2O+CH3:1+C2H6:1+C2H4:1+C4H2:1+C2H2:1+Butadiene:1+Propene:1+Butene:1+1-Butyne:1+Limonene:1+Pinene:1+Benzene:1+Toluene:1+Trimethylbenzene:1+Tetramethylbenzene:1+DMDS:1+CS2:1+SF6:1+SO2F2:1+1-Propanethiol:1+2-Methyl-1-propanethiol:1+2-Propanethiol:1+Benzenethiol:1+Cyclohexanethiol:1+DiethylSulfide:1+DMSO:1+EthylMercaptan:1+Methanethiol:1+MethylIsothiocyanate:1+Tetrahydrothiophene:1+Thiophene:1+tert-Butylmercaptan:1+Isoprene:1 ===
+Computing thermal emission above 0.0 km (50 layers)
+→ H2O iso1 (LBL)
+→ CH4 iso1 (LBL)
+→ CO2 iso1 (LBL)
+→ N2O iso1 (LBL)
+→ CH3 iso1 (LBL)
+→ C2H6 iso1 (LBL)
+→ C2H4 iso1 (LBL)
+→ C4H2 iso1 (LBL)
+→ C2H2 iso1 (LBL)
+→ Butadiene (XSC) C4H6_278.1K-760.0Torr_530.0-6500.0_0.11_N2_249_43.xsc.txt  wn=[530.0,6500.0]
+→ Propene (XSC) C3H6S_278.1K_760.0Torr_550.0-6500.0_0.112_N2_88.xsc.txt  wn=[550.0,6500.0]
+→ Butene (XSC) C4H8_278.1K-760.0K_525.0-6500.0_0.11_N2_255_43.xsc.txt  wn=[525.0,6500.0]
+→ 1-Butyne (XSC) HC=CCH2CH3_278.1K_760.0Torr_500.0-6700.0_0.112_N2_88.xsc.txt  wn=[500.0,6700.0]
+→ Limonene (XSC) C10-H16_298.1K-760.0K_600.0-6500.0_0.11_N2_352_43.xsc.txt  wn=[600.0,6500.0]
+→ Pinene (XSC) C10-H16_298.1K-760.0K_600.0-6500.0_0.11_N2_352_43.xsc.txt  wn=[600.0,6500.0]
+→ Benzene (XSC) C6H6_278.0_760.0_600.0-6500.0_09.xsc.txt  wn=[600.0,6500.0]
+→ Toluene (XSC) C6H5CH3_278.1K-760.0Torr_600.0-6500.0_0.11_N2_637_43.xsc.txt  wn=[600.0,6500.0]
+→ Trimethylbenzene (XSC) C6H3(CH3)3_298.1K_760.0Torr_550.0-6500.1_0.112_N2_88.xsc.txt  wn=[550.0,6500.1]
+→ Tetramethylbenzene (XSC) (C6H2)(CH3)4_298.1K_760.0Torr_600.0-6500.0_0.112_N2_88.xsc.txt  wn=[600.0,6500.0]
+ERROR: missing VMR column for XSC species Tetramethylbenzene
+→ DMDS (XSC) C2H6S2_278.1K-760.0K_600.0-6500.0_0.11_N2_428_43.xsc.txt  wn=[600.0,6500.0]
+ERROR: missing VMR column for XSC species DMDS
+→ CS2 (XSC) CS2_278.1K-760.0K_600.0-6500.0_0.11_N2_380_43.xsc.txt  wn=[600.0,6500.0]
+→ SF6 (XSC) SF6_278.1K-760.0Torr_560.0-6500.0_0.11_N2_220_43.xsc.txt  wn=[560.0,6500.0]
+→ SO2F2 (XSC) SO2F2_278.1K-760.0Torr_500.0-6500.0_0.11_N2_219_43.xsc.txt  wn=[500.0,6500.0]
+→ 1-Propanethiol (XSC) CH3(CH2)2SH_278.1K_760.0Torr_600.0-6500.0_0.112_N2_88.xsc.txt  wn=[600.0,6500.0]
+ERROR: missing VMR column for XSC species 1-Propanethiol
+→ 2-Methyl-1-propanethiol (XSC) (CH3)2CHCH2SH_298.1K_760.0Torr_550.0-6500.0_0.112_N2_88.xsc.txt  wn=[550.0,6500.0]
+ERROR: missing VMR column for XSC species 2-Methyl-1-propanethiol
+→ 2-Propanethiol (XSC) (CH3)2CH(HS)_278.1K_760.0Torr_580.0-6500.0_0.112_N2_88.xsc.txt  wn=[580.0,6500.0]
+ERROR: missing VMR column for XSC species 2-Propanethiol
+→ Benzenethiol (XSC) C6H5SH_298.1K_760.0Torr_550.0-6500.0_0.112_N2_88.xsc.txt  wn=[550.0,6500.0]
+ERROR: missing VMR column for XSC species Benzenethiol
+→ Cyclohexanethiol (XSC) C6H11SH_298.1K_760.0Torr_600.0-6500.0_0.112_N2_88.xsc.txt  wn=[600.0,6500.0]
+ERROR: missing VMR column for XSC species Cyclohexanethiol
+→ DiethylSulfide (XSC) (CH3CH2)2S_278.1K_760.0Torr_560.0-6500.0_0.112_N2_88.xsc.txt  wn=[560.0,6500.0]
+ERROR: missing VMR column for XSC species DiethylSulfide
+→ DMSO (XSC) C2H6OS_298.1K-760.0K_575.0-6500.0_0.11_N2_432_43.xsc.txt  wn=[575.0,6500.0]
+ERROR: missing VMR column for XSC species DMSO
+→ EthylMercaptan (XSC) CH3CH2SH_278.1K_760.0Torr_585.0-6500.0_0.112_N2_88.xsc.txt  wn=[585.0,6500.0]
+ERROR: missing VMR column for XSC species EthylMercaptan
+→ Methanethiol (XSC) CH4S_278.1K-760.0K_600.0-6500.0_0.11_N2_531_43.xsc.txt  wn=[600.0,6500.0]
+ERROR: missing VMR column for XSC species Methanethiol
+→ MethylIsothiocyanate (XSC) C2H3NS_278.1K-760.0K_600.0-6500.0_0.11_N2_530_43.xsc.txt  wn=[600.0,6500.0]
+ERROR: missing VMR column for XSC species MethylIsothiocyanate
+→ Tetrahydrothiophene (XSC) (CH2)4S_278.1K_760.0Torr_600.0-6500.0_0.112_N2_88.xsc.txt  wn=[600.0,6500.0]
+ERROR: missing VMR column for XSC species Tetrahydrothiophene
+→ Thiophene (XSC) C4H4S_278.1K_760.0Torr_580.0-6500.0_0.112_N2_88.xsc.txt  wn=[580.0,6500.0]
+ERROR: missing VMR column for XSC species Thiophene
+→ tert-Butylmercaptan (XSC) (CH3)3CSH_278.1K_760.0Torr_540.0-6500.0_0.112_N2_88.xsc.txt  wn=[540.0,6500.0]
+ERROR: missing VMR column for XSC species tert-Butylmercaptan
+→ Isoprene (XSC) C5-H8_278.1K-760.0K_600.0-6500.0_0.11_N2_505_43.xsc.txt  wn=[600.0,6500.0]
+flux range: 1.409e-27 – 1.501e-08
+tau_tot: min/med/max 1.1247546196767368e-05 0.40268817881605046 686427.1940929856
+frac tau>1 0.429538400704616
+High-res spectrum done in 1717.1s  N=94117648
+  Binning to R=1.00e+02
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=2.78e+02
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=7.74e+02
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=2.15e+03
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=5.99e+03
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=1.67e+04
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=4.64e+04
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=1.29e+05
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=3.59e+05
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Binning to R=1.00e+06
+Wl_native[-1]:17.0, wl_native[0]: 1.0
+  Saved → /home/zaniacco/orcd/pool/sgl_science_case/spectra_dict_cache_dwn1e-4_hydrocarbons/ALL_WITHOUT_DMS.pkl
+
+All scenarios done.

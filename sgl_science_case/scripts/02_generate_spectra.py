@@ -23,6 +23,9 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import re
 import time
+from bin_spec import bin_spectrum
+from astropy import constants as const
+
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -32,8 +35,8 @@ def parse_args():
     p.add_argument("--ref_therm", required=True)
     p.add_argument("--cloud-top", type=float, default=8.0)
     p.add_argument("--albedo", type=float, default=0.3)
-    p.add_argument("--resolutions", nargs="+", type=float, default=[1e5, 1e6, 1e7])
-    p.add_argument("--snrs", nargs="+", type=float, default=[5, 10, 25, 50])
+    p.add_argument("--resolutions", nargs="+", type=float, default=np.logspace(2,6,10))#[1e5, 1e6, 1e7])
+    p.add_argument("--snrs", nargs="+", type=float, default=np.logspace(0,3,10))#[5, 10, 25, 50])
     p.add_argument("--scenarios", nargs="+", default=["H2O+CH4", "H2O+CH4+N2O"],
                    help="e.g. H2O+CH4  H2O+CH4+N2O")
     p.add_argument("--xsc-dir", default="",
@@ -41,6 +44,21 @@ def parse_args():
     p.add_argument("--xsc-species", nargs="*", default=["Isoprene"],
                    help="Species that use XSC instead of LBL npz (names as in scenario string)")
     return p.parse_args()
+
+def scenario_out_name(scen_str: str) -> str:
+    s = scen_str.strip().upper()
+    # if s in {"", "BLACKBODY", "BB", "NONE", "CONTINUUM"}:
+    #     return "BLACKBODY"
+    # parts = {p.strip() for p in scen_str.split("+") if p.strip()}
+    # if "DMS:1" in parts or "DMS" in parts:
+    #     return "ALL_WITH_DMS"
+    # if "DMS:1" not in parts:
+    #     return "ALL_WITHOUT_DMS"
+    # if "CH4" in parts:
+    #     return "ALL_WITH_CH4"
+    # if "CH4" not in partS:
+    #     return "ALL_WITHOUT_CH4"
+    return s
 
 #### xsc helpers:
 
@@ -92,6 +110,39 @@ XSC_ALIASES = {
 
     # Longer alkene
     "1-Decene": ["CH2CH(CH2)7CH3"],
+    
+    "DMS": ["C2H6S"],
+    "DMDS": ["C2H6S2"],
+    "CS2": ["CS2"],
+    "SF6": ["SF6"],
+    "SO2F2": ["SO2F2"],
+    "1-Propanethiol": ["CH3(CH2)2SH"],
+    "2-Methyl-1-propanethiol": ["(CH3)2CHCH2SH"],
+    "2-Propanethiol": ["(CH3)2CH(HS)"],
+    "Benzenethiol": ["C6H5SH"],
+    "Cyclohexanethiol": ["C6H11SH"],
+    "DiethylSulfide": ["(CH3CH2)2S"],
+    "DMSO": ["C2H6OS"],
+    "EthylMercaptan": ["CH3CH2SH"],
+    "Methanethiol": ["CH4S"],
+    "MethylIsothiocyanate": ["C2H3NS"],
+    "Tetrahydrothiophene": ["(CH2)4S"],
+    "Thiophene": ["C4H4S"],
+    "tert-Butylmercaptan": ["(CH3)3CSH"],
+
+    # --- XSC on disk but no (or weak) profile column unless you add one ---
+    "DiethylSulfate": ["(C2H5O)2SO2"],
+    "DimethylSulfate": ["C2H6O4S"],
+    "PropyleneSulfide": ["C3H6S"],
+    "Thiophosgene": ["CCl2S"],
+    "PerchloromethylMercaptan": ["CCl3SCl"],
+    "EthyleneSulfide": ["CH2CH2S"],
+    "MethanesulfonylChloride": ["CH3SO2Cl"],
+    "Thioglycol": ["HS(CH2)2OH"],
+    "SO2Cl2": ["SO2Cl2"],
+    "SOF2": ["SOF2"],
+    "SPCl3": ["SPCl3"],
+    
 }
 
 
@@ -143,6 +194,7 @@ def add_xsc_molecule_tau(
         return delta_tau_layers
 
     ppmv_col = above_df[col].astype(float).values
+
     n_layers = len(above_df)
     for i in range(n_layers):
         if i < n_layers - 1:
@@ -164,84 +216,83 @@ def load_abs_coef(mol, iso, alt, cache_dir):
     data = np.load(path)
     return data["wn"], data["coef"]
 
-def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
-    """
-    Robust flux-conserving-ish rebinning for extremely large native grids.
-    Avoids SpectRes entirely.
-    """
-    # if err_data is None:
-    #     err_data = []
+def bin_data(wave_data, flux_data, R_bin,  err_data=[]):
+    """Bin the data to resolution R_bin (and err_data if provided)."""
+    wav_binned, flux_binned, __ = bin_spectrum(wave_data, flux_data, R_bin, err_data=err_data)
+    return wav_binned, flux_binned
 
-    wl_native = np.asarray(wl_native, dtype=np.float64)
-    spectrum_native = np.asarray(spectrum_native, dtype=np.float64)
 
-    # Ensure increasing wavelength
-    if wl_native[0] > wl_native[-1]:
-        wl_native = wl_native[::-1]
-        spectrum_native = spectrum_native[::-1]
-        # if len(err_data) > 0:
-        #     err_data = np.asarray(err_data)[::-1]
+# def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
+#     """
+#     Robust flux-conserving-ish rebinning for extremely large native grids.
+#     Avoids SpectRes entirely.
+#     """
+#     # if err_data is None:
+#     #     err_data = []
 
-    # Approx native resolution
-    native_R = np.median(wl_native[:-1] / np.diff(wl_native))
+#     wl_native = np.asarray(wl_native, dtype=np.float64)
+#     spectrum_native = np.asarray(spectrum_native, dtype=np.float64)
+
+#     # Ensure increasing wavelength
+#     if wl_native[0] > wl_native[-1]:
+#         wl_native = wl_native[::-1]
+#         spectrum_native = spectrum_native[::-1]
+#         # if len(err_data) > 0:
+#         #     err_data = np.asarray(err_data)[::-1]
+
+#     # Approx native resolution
+#     native_R = np.median(wl_native[:-1] / np.diff(wl_native))
     
-    # If requested R is close to or higher than native, just return native
-    if R_bin >= 0.95 * native_R:
-        print(f"Requested R={R_bin:.2e} ≥ native R≈{native_R:.2e} → returning native grid")
-        # if len(err_data) > 0:
-        #     return wl_native, spectrum_native, np.asarray(err_data)
-        return wl_native, spectrum_native #, None
+#     # If requested R is close to or higher than native, just return native
+#     if R_bin >= 0.95 * native_R:
+#         print(f"Requested R={R_bin:.2e} ≥ native R≈{native_R:.2e} → returning native grid")
+#         # if len(err_data) > 0:
+#         #     return wl_native, spectrum_native, np.asarray(err_data)
+#         return wl_native, spectrum_native #, None
 
-    # Build new wavelength grid at constant R
-    log_wl_min = np.log(wl_native[0])
-    log_wl_max = np.log(wl_native[-1])
-    delta_log_wl = 1.0 / R_bin
-    n_bins = int(np.floor((log_wl_max - log_wl_min) / delta_log_wl)) + 1
+#     # Build new wavelength grid at constant R
+#     log_wl_min = np.log(wl_native[0])
+#     log_wl_max = np.log(wl_native[-1])
+#     delta_log_wl = 1.0 / R_bin
+#     n_bins = int(np.floor((log_wl_max - log_wl_min) / delta_log_wl)) + 1
     
-    # Safety: never create more bins than native points
-    n_bins = min(n_bins, len(wl_native) - 2)
+#     # Safety: never create more bins than native points
+#     n_bins = min(n_bins, len(wl_native) - 2)
     
-    log_wl_binned = np.linspace(log_wl_min, log_wl_max, n_bins)
-    wl_binned = np.exp(log_wl_binned)
+#     log_wl_binned = np.linspace(log_wl_min, log_wl_max, n_bins)
+#     wl_binned = np.exp(log_wl_binned)
 
-    # Simple but stable interpolation (linear in wavelength)
-    # For most detection/metric work this is sufficient
-    interp = interp1d(wl_native, spectrum_native, kind='linear', 
-                      bounds_error=False, fill_value='extrapolate')
-    spectrum_binned = interp(wl_binned)
+#     # Simple but stable interpolation (linear in wavelength)
+#     # For most detection/metric work this is sufficient
+#     interp = interp1d(wl_native, spectrum_native, kind='linear', 
+#                       bounds_error=False, fill_value='extrapolate')
+#     spectrum_binned = interp(wl_binned)
 
-    # if len(err_data) > 0:
-    #     err_interp = interp1d(wl_native, err_data, kind='linear',
-    #                           bounds_error=False, fill_value='extrapolate')
-    #     err_binned = err_interp(wl_binned)
-    #     return wl_binned, spectrum_binned, err_binned
+#     # if len(err_data) > 0:
+#     #     err_interp = interp1d(wl_native, err_data, kind='linear',
+#     #                           bounds_error=False, fill_value='extrapolate')
+#     #     err_binned = err_interp(wl_binned)
+#     #     return wl_binned, spectrum_binned, err_binned
 
-    return wl_binned, spectrum_binned
+    # return wl_binned, spectrum_binned
 
-def inject_poisson_noise(signal, snr, seed=42, mode="gaussian_approx"):
+def inject_noise(signal, snr):
     """
     SNR defined on the continuum/mean signal level.
-    Works for transmission or thermal radiance.
+    Works for transmission or thermal flux.
     """
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng()
     signal = np.asarray(signal, dtype=np.float64)
 
     # positive reference level (avoid zeros)
-    ref = np.nanmedian(np.abs(signal))
-    if ref <= 0:
-        ref = np.nanmax(np.abs(signal))
-    if ref <= 0:
-        ref = 1.0
+    ref = np.nanmean(np.abs(signal))
+
 
     noise_std = ref / float(snr)   # constant σ per bin
-    # or wavelength-dependent: noise_std = np.maximum(np.abs(signal), ref) / snr
 
-    if mode == "gaussian_approx":
-        noise = rng.normal(0.0, noise_std, size=signal.shape)
-        noisy = signal + noise
-        errorbars = np.full_like(signal, noise_std)
-    else:
-        raise ValueError("mode must be 'gaussian_approx'")
+    noise = rng.normal(0.0, noise_std, size=signal.shape)
+    noisy = signal + noise
+    errorbars = np.full_like(signal, noise_std)
 
     return noisy.astype(np.float32), errorbars.astype(np.float32)
 
@@ -271,16 +322,14 @@ def compute_thermal_emission(
         xsc_species = []
     xsc_set = {s.upper() for s in xsc_species}
 
-    t0 = time.time()
     above_df = df_atm[df_atm["ALT_km"] >= cloud_top].copy()
-    print(f"Computing thermal emission above {cloud_top} km ({len(above_df)} layers)", flush = True)
-    
+    print(f"Computing thermal emission above {cloud_top} km ({len(above_df)} layers)", flush=True)
+
     alt_km = above_df["ALT_km"].values
     dz_km = np.diff(alt_km, append=alt_km[-1] + np.median(np.diff(alt_km)))
     dz_cm = dz_km * 1e5
     temps = above_df["TEMP_K"].values
     density = above_df["DENSITY_cm3"].astype(float).values
-
     if T_surface is None:
         T_surface = float(temps[0])
 
@@ -288,13 +337,12 @@ def compute_thermal_emission(
     wn_grid_ref = None
     n_layers = len(above_df)
 
-    # --- LBL species only ---
     lbl_species = [(m, i) for m, i in molecules_isotopes if m.upper() not in xsc_set]
     xsc_only = [m for m, i in molecules_isotopes if m.upper() in xsc_set]
 
+    # --- LBL ---
     for mol, iso in lbl_species:
         col_name = f"{mol}_iso{iso}_ppmv"
-        t_mol = time.time()
         if col_name not in df_atm.columns:
             print(f"ERROR: missing {col_name}")
             continue
@@ -302,58 +350,77 @@ def compute_thermal_emission(
         ppmv_col = above_df[col_name].astype(float).values
         for layer_pos, (orig_idx, row) in enumerate(above_df.iterrows()):
             wn_grid, coef = load_abs_coef(mol, iso, orig_idx, abs_coef_dir)
+            wn_grid = np.asarray(wn_grid, dtype=np.float64).ravel()
+            coef = np.asarray(coef, dtype=np.float64).ravel()
             if wn_grid_ref is None:
                 wn_grid_ref = wn_grid
-                delta_tau_layers = np.zeros((n_layers, len(coef)), dtype=np.float64)
-            if layer_pos < n_layers - 1:
-                ppmv_avg = 0.5 * (ppmv_col[layer_pos] + ppmv_col[layer_pos + 1])
-            else:
-                ppmv_avg = ppmv_col[layer_pos]
-            vmr_avg = ppmv_avg * 1e-6
-            
-            if layer_pos % 10 == 0 or layer_pos == n_layers - 1:
-                print(
-                    f"  layer {layer_pos+1}/{n_layers}  alt={above_df['ALT_km'].iloc[layer_pos]:.1f} km  "
-                    f"elapsed={time.time()-t_mol:.1f}s",
-                    flush=True,
-                )
-                
-            # HAPI coef in cm^-1 style (your working CO2 convention)
-            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos] #* vmr_avg
-            
+                delta_tau_layers = np.zeros((n_layers, wn_grid_ref.size), dtype=np.float64)
+            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos]
 
-    if delta_tau_layers is None:
-        raise ValueError("No LBL tau accumulated — need at least one LBL species to set the grid")
+    # --- if no LBL: seed grid from first XSC ---
+    if wn_grid_ref is None:
+        if not xsc_only:
+            # --- pure blackbody if no absorbers ---
+            if wn_grid_ref is None and not lbl_species and not xsc_only:
+                # Prefer same grid as science runs
+                sample = None
+                if xsc_dir:
+                    wl_lo, wl_hi, dwn = 1.0, 17.0, 1e-4
+                    wn_hi, wn_lo = 1e4 / wl_lo, 1e4 / wl_hi
+                    wn_grid_ref = np.arange(wn_lo, wn_hi + 0.5 * dwn, dwn, dtype=np.float64)
 
-        
-    # --- isothermal XSC species (e.g. isoprene) ---
+                wn_grid_ref = np.sort(np.unique(wn_grid_ref))
+                wavelengths_um = (1e4 / wn_grid_ref).astype(np.float32)
+                flux = planck_wn(wn_grid_ref, T_surface).astype(np.float32)
+                order = np.argsort(wavelengths_um)
+                return wavelengths_um[order], flux[order]
+        if not xsc_dir:
+            raise ValueError(f"XSC species {xsc_only} requested but --xsc-dir not set")
+        path0 = find_xsc_file(Path(xsc_dir), xsc_only[0])
+        wn0, _ = parse_hitran_xsc(path0)
+        wn_grid_ref = np.asarray(wn0, dtype=np.float64).ravel()
+        order = np.argsort(wn_grid_ref)
+        wn_grid_ref = wn_grid_ref[order]
+        wn_grid_ref = wn_grid_ref[np.concatenate([[True], np.diff(wn_grid_ref) > 0])]
+        delta_tau_layers = np.zeros((n_layers, wn_grid_ref.size), dtype=np.float64)
+        print(f"No LBL grid — using XSC grid from {path0.name} (N={wn_grid_ref.size})", flush=True)
+
+    wn_grid_ref = np.asarray(wn_grid_ref, dtype=np.float64).ravel()
+
+    # --- XSC ---
     if xsc_only and not xsc_dir:
         raise ValueError(f"XSC species {xsc_only} requested but --xsc-dir not set")
     for mol in xsc_only:
-        # XSC is cm^2/molecule → use density
         delta_tau_layers = add_xsc_molecule_tau(
             delta_tau_layers, wn_grid_ref, above_df, dz_cm, density,
             mol, xsc_dir, use_density=True,
         )
 
-    # --- thermal sum (unchanged) ---
+    if delta_tau_layers is None:
+        raise ValueError("No tau accumulated")
+
+    # --- thermal sum ---
     tau_above = np.zeros_like(delta_tau_layers)
     for i in range(n_layers - 2, -1, -1):
         tau_above[i] = tau_above[i + 1] + delta_tau_layers[i + 1]
-
     tau_tot = delta_tau_layers.sum(axis=0)
+
     I = planck_wn(wn_grid_ref, T_surface) * np.exp(-np.minimum(tau_tot, 50.0))
     for i in range(n_layers):
         dtau = np.minimum(delta_tau_layers[i], 50.0)
         B_i = planck_wn(wn_grid_ref, temps[i])
         I += B_i * np.exp(-np.minimum(tau_above[i], 50.0)) * (1.0 - np.exp(-dtau))
 
-    wavelengths_um = (1e4 / wn_grid_ref).astype(np.float32)
-    radiance = I.astype(np.float32)
-    print(f"Radiance range: {radiance.min():.3e} – {radiance.max():.3e}")
+    wavelengths_um = (1.e4 / wn_grid_ref).astype(np.float32)
+    flux = I.astype(np.float32) * np.pi / const.c.cgs.value
+    
+    order = np.argsort(wavelengths_um)
+    wavelengths_um = wavelengths_um[order]
+    flux = flux[order]
+    print(f"flux range: {flux.min():.3e} – {flux.max():.3e}")
     print("tau_tot: min/med/max", tau_tot.min(), np.median(tau_tot), tau_tot.max())
     print("frac tau>1", np.mean(tau_tot > 1))
-    return wavelengths_um, radiance
+    return wavelengths_um, flux
 
 def parse_scenario(s: str):
     """
@@ -366,9 +433,8 @@ def parse_scenario(s: str):
       'H2O+CH4:1'        -> [('H2O', 1), ('CH4', 1)]
     """
     s = s.strip()
-    if not s:
-        raise ValueError("Empty scenario string")
-
+    if not s or s.upper() in {"BLACKBODY", "BB", "NONE", "CONTINUUM"}:
+        return []  # no molecules
     out = []
     for part in s.split("+"):
         part = part.strip()
@@ -403,13 +469,14 @@ def main():
     for scen_str in args.scenarios:
         scenario = parse_scenario(scen_str)
         # avoid ":" in filenames on some filesystems
-        safe_name = scen_str.replace(":", "")
+        safe_name = scenario_out_name(scen_str)
+        
         out_path = out_dir / f"{safe_name}.pkl"
 
         print(f"\n=== Scenario {scen_str} ===")
 
         if args.ref_therm.lower() == "thermal":
-            wl_high, radiance_high = compute_thermal_emission(
+            wl_high, flux_high = compute_thermal_emission(
                 scenario,
                 df_atm,
                 abs_dir,
@@ -417,41 +484,40 @@ def main():
                 xsc_dir=xsc_dir,
                 xsc_species=xsc_species,
             )
-        else:
-            wl_high, radiance_high = compute_reflectivity(
-                scenario,
-                df_atm,
-                abs_dir,
-                args.cloud_top,
-                args.albedo,
-            )
+#         else:
+#             wl_high, flux_high = compute_reflectivity(
+#                 scenario,
+#                 df_atm,
+#                 abs_dir,
+#                 args.cloud_top,
+#                 args.albedo,
+#             )
             
             print(f"High-res spectrum done in {time.time()-t_sc:.1f}s  N={len(wl_high)}", flush=True)
 
         scenario_dict = {}
         for R in args.resolutions:
             print(f"  Binning to R={R:.2e}")
-            wl_b, rad_b = bin_spectrum_robust(wl_high, radiance_high, R)
+            wl_b, flux_b = bin_data(wl_high, flux_high, R)
             entry = {
                 "wavelength_grid": wl_b.astype(np.float32),
-                "radiance_clean": rad_b.astype(np.float32),
+                "flux_clean": flux_b.astype(np.float32),
                 "resolution": int(R),
             }
-            # Optional noise:
             for snr in args.snrs:
-                noisy, err = inject_poisson_noise(rad_b, snr)
-                entry[f"radiance_snr{int(snr)}"] = noisy
+                noisy, err = inject_noise(flux_b, snr)
+                entry[f"flux_snr{int(snr)}"] = noisy
                 entry[f"error_snr{int(snr)}"] = err
 
             scenario_dict[int(R)] = entry
-            del wl_b, rad_b, entry
+            del wl_b, flux_b, entry
             gc.collect()
 
         with open(out_path, "wb") as f:
             pickle.dump(scenario_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
         print(f"  Saved → {out_path}")
 
-        del wl_high, radiance_high, scenario_dict
+        del wl_high, flux_high, scenario_dict
         gc.collect()
 
     print("\nAll scenarios done.")
