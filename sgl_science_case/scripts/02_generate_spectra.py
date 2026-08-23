@@ -25,6 +25,7 @@ import re
 import time
 from bin_spec import bin_spectrum
 from astropy import constants as const
+from numpy.lib.stride_tricks import sliding_window_view
 
 
 def parse_args():
@@ -43,10 +44,15 @@ def parse_args():
                    help="Directory of HITRAN .xsc files (for isoprene, etc.)")
     p.add_argument("--xsc-species", nargs="*", default=["Isoprene"],
                    help="Species that use XSC instead of LBL npz (names as in scenario string)")
+    p.add_argument("--molecule_isotope", default = None)
+    p.add_argument("--isotope_ratio", default = None)
+    p.add_argument("--sigma_r_frac",type=float, default = 0)
+
     return p.parse_args()
 
 def scenario_out_name(scen_str: str) -> str:
     s = scen_str.strip().upper()
+   
     # if s in {"", "BLACKBODY", "BB", "NONE", "CONTINUUM"}:
     #     return "BLACKBODY"
     # parts = {p.strip() for p in scen_str.split("+") if p.strip()}
@@ -58,7 +64,7 @@ def scenario_out_name(scen_str: str) -> str:
     #     return "ALL_WITH_CH4"
     # if "CH4" not in partS:
     #     return "ALL_WITHOUT_CH4"
-    return s
+    return f"hydrocarbons_with_CH4_R_0"
 
 #### xsc helpers:
 
@@ -211,8 +217,15 @@ def add_xsc_molecule_tau(
     return delta_tau_layers
 
 
-def load_abs_coef(mol, iso, alt, cache_dir):
-    path = Path(cache_dir) / f"{mol}_iso{iso}_alt{alt:03d}.npz"
+def load_abs_coef(mol, iso, alt, cache_dir, isotope_molecule=None, isotope_ratio=None):
+    tag = ""
+    if (
+        isotope_molecule
+        and mol.upper() == isotope_molecule.upper()
+        and isotope_ratio is not None
+    ):
+        tag = f"_r{float(isotope_ratio):g}"
+    path = Path(cache_dir) / f"{mol}_iso{iso}_alt{alt:03d}{tag}.npz"
     data = np.load(path)
     return data["wn"], data["coef"]
 
@@ -222,79 +235,87 @@ def bin_data(wave_data, flux_data, R_bin,  err_data=[]):
     return wav_binned, flux_binned
 
 
-# def bin_spectrum_robust(wl_native, spectrum_native, R_bin, err_data=None):
-#     """
-#     Robust flux-conserving-ish rebinning for extremely large native grids.
-#     Avoids SpectRes entirely.
-#     """
-#     # if err_data is None:
-#     #     err_data = []
-
-#     wl_native = np.asarray(wl_native, dtype=np.float64)
-#     spectrum_native = np.asarray(spectrum_native, dtype=np.float64)
-
-#     # Ensure increasing wavelength
-#     if wl_native[0] > wl_native[-1]:
-#         wl_native = wl_native[::-1]
-#         spectrum_native = spectrum_native[::-1]
-#         # if len(err_data) > 0:
-#         #     err_data = np.asarray(err_data)[::-1]
-
-#     # Approx native resolution
-#     native_R = np.median(wl_native[:-1] / np.diff(wl_native))
-    
-#     # If requested R is close to or higher than native, just return native
-#     if R_bin >= 0.95 * native_R:
-#         print(f"Requested R={R_bin:.2e} ≥ native R≈{native_R:.2e} → returning native grid")
-#         # if len(err_data) > 0:
-#         #     return wl_native, spectrum_native, np.asarray(err_data)
-#         return wl_native, spectrum_native #, None
-
-#     # Build new wavelength grid at constant R
-#     log_wl_min = np.log(wl_native[0])
-#     log_wl_max = np.log(wl_native[-1])
-#     delta_log_wl = 1.0 / R_bin
-#     n_bins = int(np.floor((log_wl_max - log_wl_min) / delta_log_wl)) + 1
-    
-#     # Safety: never create more bins than native points
-#     n_bins = min(n_bins, len(wl_native) - 2)
-    
-#     log_wl_binned = np.linspace(log_wl_min, log_wl_max, n_bins)
-#     wl_binned = np.exp(log_wl_binned)
-
-#     # Simple but stable interpolation (linear in wavelength)
-#     # For most detection/metric work this is sufficient
-#     interp = interp1d(wl_native, spectrum_native, kind='linear', 
-#                       bounds_error=False, fill_value='extrapolate')
-#     spectrum_binned = interp(wl_binned)
-
-#     # if len(err_data) > 0:
-#     #     err_interp = interp1d(wl_native, err_data, kind='linear',
-#     #                           bounds_error=False, fill_value='extrapolate')
-#     #     err_binned = err_interp(wl_binned)
-#     #     return wl_binned, spectrum_binned, err_binned
-
-    # return wl_binned, spectrum_binned
-
-def inject_noise(signal, snr):
+def inject_white_red_noise(
+    signal,
+    snr_white,
+    sigma_r_frac=0.5,
+    corr_bins=8,
+    floor_frac=0.05,
+    rng=None,
+):
     """
-    SNR defined on the continuum/mean signal level.
-    Works for transmission or thermal flux.
+    White + red noise in the spectral domain (Pont-style).
+
+    White noise is local (photon-like):
+        sigma_w[i] = max(|signal[i]|, floor_frac * median|signal|) / snr_white
+
+    Red noise is a correlated component with RMS
+        sigma_r[i] = sigma_r_frac * sigma_w[i]
+    built by smoothing a unit white series, then scaling per bin.
+
+    Parameters
+    ----------
+    snr_white : float
+        Target SNR per bin relative to the local reference level.
+    sigma_r_frac : float
+        Red amplitude as a fraction of local white sigma (0 = white only).
+    corr_bins : int
+        Correlation length in spectral bins.
+    floor_frac : float
+        Floor for the reference level as a fraction of median |signal|
+        (avoids sigma → 0 in deep cores / zeros).
     """
-    rng = np.random.default_rng()
-    signal = np.asarray(signal, dtype=np.float64)
+    rng = np.random.default_rng() if rng is None else rng
+    y = np.asarray(signal, dtype=np.float64)
 
-    # positive reference level (avoid zeros)
-    ref = np.nanmean(np.abs(signal))
+    med = np.nanmedian(np.abs(y))
+    if not np.isfinite(med) or med <= 0:
+        med = 1.0
+
+    # per-bin reference (Poisson-like) with continuum floor
+    ref = np.maximum(np.abs(y), floor_frac * med)
+    sigma_w = ref / float(snr_white)  # shape (N,)
+
+    # white component (independent draws, local amplitude)
+    white = rng.normal(0.0, 1.0, size=y.shape) * sigma_w
+
+    if sigma_r_frac <= 0:
+        noise = white
+        sigma_eff = sigma_w.copy()
+    else:
+        k = max(1, int(corr_bins))
+        pad = k // 2
+
+        # smooth a unit-variance white series → correlated structure
+        unit = rng.normal(0.0, 1.0, size=y.shape)
+        wpad = np.pad(unit, pad, mode="edge") # padding to avoid edge-effects
+        kernel = np.ones(k) / k # correlating
+        red_unit = np.convolve(wpad, kernel, mode="valid") # correlating neighboring bins
+        
+        #more error safeties
+        if len(red_unit) > len(y):
+            red_unit = red_unit[: len(y)]
+        elif len(red_unit) < len(y):
+            red_unit = np.pad(red_unit, (0, len(y) - len(red_unit)), mode="edge")
+
+        # normalize structure, then apply local red amplitude
+        red_unit = red_unit / (np.std(red_unit) + 1e-30)
+        sigma_r = sigma_r_frac * sigma_w          # per-bin
+        red = red_unit * sigma_r
+
+        noise = white + red
+        # effective per-bin sigma (white and red independent)
+        sigma_eff = np.sqrt(sigma_w**2 + sigma_r**2)
+
+    noisy = y + noise
+    return noisy.astype(np.float32), sigma_eff.astype(np.float32)
 
 
-    noise_std = ref / float(snr)   # constant σ per bin
+def pont_V(n, sigma_w, sigma_r):
+    """Paper eq. (9): variance of the mean of n correlated samples."""
+    n = np.asarray(n, dtype=np.float64)
+    return sigma_w**2 / n + sigma_r**2
 
-    noise = rng.normal(0.0, noise_std, size=signal.shape)
-    noisy = signal + noise
-    errorbars = np.full_like(signal, noise_std)
-
-    return noisy.astype(np.float32), errorbars.astype(np.float32)
 
 def planck_wn(wn_cm, T):
     """Planck function in wavenumber units [wn in cm^-1, T in K].
@@ -309,6 +330,15 @@ def planck_wn(wn_cm, T):
     # stable for large x
     return c1 * wn**3 / np.expm1(x)
 
+#HELPERS FOR NORMALIZING HYDROCARBON AMPLITUDES
+
+WL_MIN, WL_MAX = 3.0, 4.0  # µm  — degeneracy window
+TARGET_MOL = ("CH4", 1)     # match this amplitude
+
+def window_mask(wn_cm, wl_min=WL_MIN, wl_max=WL_MAX):
+    wl = 1e4 / np.asarray(wn_cm, dtype=np.float64)
+    return (wl >= wl_min) & (wl <= wl_max)
+
 def compute_thermal_emission(
     molecules_isotopes,
     df_atm,
@@ -317,6 +347,8 @@ def compute_thermal_emission(
     T_surface=None,
     xsc_dir="",
     xsc_species=None,
+    isotope_molecule=None,
+    isotope_ratio=None,
 ):
     if xsc_species is None:
         xsc_species = []
@@ -340,6 +372,14 @@ def compute_thermal_emission(
     lbl_species = [(m, i) for m, i in molecules_isotopes if m.upper() not in xsc_set]
     xsc_only = [m for m, i in molecules_isotopes if m.upper() in xsc_set]
 
+#________Precompute scales from one mid-atmosphere layer________________________________________________________________
+    ref_idx = len(above_df) // 2
+    scales = {}
+    wn_ref, coef_ch4 = load_abs_coef("CH4", 1, above_df.index[ref_idx], abs_coef_dir)
+    m = window_mask(wn_ref)
+    peak_ch4 = np.max(coef_ch4[m]) * (above_df[f"CH4_iso1_ppmv"].iloc[ref_idx] * 1e-6)
+#________________________________________________________________________________________________________________________
+
     # --- LBL ---
     for mol, iso in lbl_species:
         col_name = f"{mol}_iso{iso}_ppmv"
@@ -347,33 +387,44 @@ def compute_thermal_emission(
             print(f"ERROR: missing {col_name}")
             continue
         print(f"→ {mol} iso{iso} (LBL)")
+        
+# Scaling tests _________________________________________________________________________________________________________________________
+        
+        wn_grid, coef = load_abs_coef(mol,iso,above_df.index[ref_idx],abs_coef_dir)
+        m = window_mask(wn_grid)
+        peak = np.max(coef[m]) * (above_df[f"{mol}_iso{iso}_ppmv"].iloc[ref_idx] * 1e-6)
+        scales[(mol, iso)] = peak_ch4 / peak if peak > 0 else 0.0
+        print(f"Scale for {mol} = {scales[(mol,iso)]}")
+
+# _________________________________________________________________________________________________________________________________________________________
+                
         ppmv_col = above_df[col_name].astype(float).values
         for layer_pos, (orig_idx, row) in enumerate(above_df.iterrows()):
-            wn_grid, coef = load_abs_coef(mol, iso, orig_idx, abs_coef_dir)
+            wn_grid, coef = load_abs_coef(mol, iso, orig_idx, abs_coef_dir, isotope_molecule=isotope_molecule, isotope_ratio = isotope_ratio)
             wn_grid = np.asarray(wn_grid, dtype=np.float64).ravel()
             coef = np.asarray(coef, dtype=np.float64).ravel()
             if wn_grid_ref is None:
                 wn_grid_ref = wn_grid
-                delta_tau_layers = np.zeros((n_layers, wn_grid_ref.size), dtype=np.float64)
-            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos]
+                delta_tau_layers = np.zeros((n_layers, wn_grid_ref.size), dtype=np.float64)                
+                
+            #NORMALIZING FOR HYDROCARBONS            
+            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos] * scales[(mol,iso)] 
 
     # --- if no LBL: seed grid from first XSC ---
     if wn_grid_ref is None:
         if not xsc_only:
-            # --- pure blackbody if no absorbers ---
             if wn_grid_ref is None and not lbl_species and not xsc_only:
-                # Prefer same grid as science runs
-                sample = None
-                if xsc_dir:
-                    wl_lo, wl_hi, dwn = 1.0, 17.0, 1e-4
-                    wn_hi, wn_lo = 1e4 / wl_lo, 1e4 / wl_hi
-                    wn_grid_ref = np.arange(wn_lo, wn_hi + 0.5 * dwn, dwn, dtype=np.float64)
-
+                # pure continuum: build a default wavenumber grid
+                wl_lo, wl_hi, dwn = 1.0, 17.0, 1e-4
+                wn_hi, wn_lo = 1e4 / wl_lo, 1e4 / wl_hi
+                wn_grid_ref = np.arange(wn_lo, wn_hi + 0.5 * dwn, dwn, dtype=np.float64)
                 wn_grid_ref = np.sort(np.unique(wn_grid_ref))
+
                 wavelengths_um = (1e4 / wn_grid_ref).astype(np.float32)
                 flux = planck_wn(wn_grid_ref, T_surface).astype(np.float32)
                 order = np.argsort(wavelengths_um)
                 return wavelengths_um[order], flux[order]
+            
         if not xsc_dir:
             raise ValueError(f"XSC species {xsc_only} requested but --xsc-dir not set")
         path0 = find_xsc_file(Path(xsc_dir), xsc_only[0])
@@ -465,17 +516,28 @@ def main():
     df_atm = pd.read_csv(args.atmosphere)
     
     t_sc = time.time()
+    
+    isotope_molecule = args.molecule_isotope
+    isotope_ratio = args.isotope_ratio
+    
+    sigma_r_frac = args.sigma_r_frac
+    
+    # print("Sigma R Frac = ", sigma_r_frac)
+
 
     for scen_str in args.scenarios:
         scenario = parse_scenario(scen_str)
         # avoid ":" in filenames on some filesystems
         safe_name = scenario_out_name(scen_str)
-        
+        if args.molecule_isotope and args.isotope_ratio is not None:
+            if args.molecule_isotope.upper() in safe_name.upper():
+                safe_name = f"{safe_name}_r{float(args.isotope_ratio):g}"
         out_path = out_dir / f"{safe_name}.pkl"
 
         print(f"\n=== Scenario {scen_str} ===")
 
         if args.ref_therm.lower() == "thermal":
+
             wl_high, flux_high = compute_thermal_emission(
                 scenario,
                 df_atm,
@@ -483,7 +545,10 @@ def main():
                 cloud_top=args.cloud_top,
                 xsc_dir=xsc_dir,
                 xsc_species=xsc_species,
+                isotope_molecule=isotope_molecule,
+                isotope_ratio=isotope_ratio,
             )
+            
 #         else:
 #             wl_high, flux_high = compute_reflectivity(
 #                 scenario,
@@ -505,7 +570,13 @@ def main():
                 "resolution": int(R),
             }
             for snr in args.snrs:
-                noisy, err = inject_noise(flux_b, snr)
+                # noisy, err = inject_noise(flux_b, snr)
+                
+                # Red-noise injection
+                # σ_r is the red noise, where we have taken its contribution as half of the σ of the white noise
+                noisy, err = inject_white_red_noise(
+                    flux_b, snr_white=snr, sigma_r_frac=sigma_r_frac, corr_bins=10
+                )
                 entry[f"flux_snr{int(snr)}"] = noisy
                 entry[f"error_snr{int(snr)}"] = err
 

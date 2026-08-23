@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 596, in <module>
+    
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 575, in main
+    # Red-noise injection
+                 ^^^^^^^^
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 282, in inject_white_red_noise
+    if sigma_r_frac <= 0:
+       ^^^^^^^^^^^^^^^^^
+TypeError: '<=' not supported between instances of 'str' and 'int'

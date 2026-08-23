@@ -29,7 +29,33 @@ def parse_args():
     p.add_argument("--wl-max", type=float, default=8.5)
     p.add_argument("--cloud-top", type=float, default=0.0)
     p.add_argument("--molecules", nargs="+", default=["H2O:1", "CH4:1", "N2O:1"])
+    p.add_argument("--isotope-molecule", default=None,
+                   help="Molecule for iso1/iso2 ratio (e.g. CO2). None = no ratio scaling.")
+    p.add_argument("--isotope-ratio", type=float, default=None,
+                   help="VMR_iso1 / VMR_iso2 for --isotope-molecule (e.g. 99).")
     return p.parse_args()
+
+# Isotope ratio handling ================================================================================================================================================
+
+def apply_isotope_ratio_vmrs(vmr1, vmr2, ratio):
+    """
+    Keep total VMR fixed; set vmr1/vmr2 = ratio.
+    ratio = VMR_iso1 / VMR_iso2.
+    """
+    total = float(vmr1) + float(vmr2)
+    if total <= 0 or ratio is None or ratio <= 0:
+        return float(vmr1), float(vmr2)
+    v1 = total * ratio / (ratio + 1.0)
+    v2 = total / (ratio + 1.0)
+    return v1, v2
+
+def ratio_tag(isotope_molecule, isotope_ratio, mol):
+    if isotope_molecule and mol.upper() == isotope_molecule.upper() and isotope_ratio is not None:
+        # filesystem-safe tag, e.g. _r99 or _r0.5
+        return f"_r{isotope_ratio:g}"
+    return ""
+
+# =======================================================================================================================================================================
 
 def get_molecule_id(name):
     from hapi import ISO
@@ -38,29 +64,59 @@ def get_molecule_id(name):
             return M
     raise ValueError(f"Molecule {name} not found")
 
-def compute_absorption_coefficient(molecule, isotope, dwn, altitude_idx, df_atm, wn_min, wn_max):
-    from hapi import absorptionCoefficient_Voigt #Computes absorption cross sections through Hapi
-
-    # Retrieve molecule id and table of linelists
+def compute_absorption_coefficient(
+    molecule, isotope, dwn, altitude_idx, df_atm, wn_min, wn_max,
+    isotope_molecule=None, isotope_ratio=None,
+):
+    from hapi import absorptionCoefficient_Voigt
     M = get_molecule_id(molecule)
     table_name = f"{molecule}_iso{isotope}"
 
-    #From atmosphere profile table, retrive pressure, vmr, and temperature at input layer
-    p_atm = df_atm["PRES_mb"].iloc[altitude_idx] / 1013.25
-    p_atm_below = df_atm["PRES_mb"].iloc[altitude_idx-1]/1013.25
-    vmr = df_atm[f"{molecule}_iso{isotope}_ppmv"].iloc[altitude_idx] / 1e6
-    vmr_below = df_atm[f"{molecule}_iso{isotope}_ppmv"].iloc[altitude_idx - 1] / 1e6
-    T = df_atm["TEMP_K"].iloc[altitude_idx]
-    T_below = df_atm["TEMP_K"].iloc[altitude_idx-1]
-    print(f"  {molecule} iso{isotope} alt={altitude_idx} T={T:.1f}K p={p_atm:.4f} vmr={vmr:.3e}")
+    # safe layer average (handles alt 0)
+    i = altitude_idx
+    j = max(i - 1, 0)
 
-    # Because the layers are separated by a finite distance, I take the average values between the layer below and the layer being computed
+    p_atm = df_atm["PRES_mb"].iloc[i] / 1013.25
+    p_below = df_atm["PRES_mb"].iloc[j] / 1013.25
+    T = float(df_atm["TEMP_K"].iloc[i])
+    T_below = float(df_atm["TEMP_K"].iloc[j])
+    P_average = 0.5 * (p_atm + p_below)
+    T_average = 0.5 * (T + T_below)
 
-    P_average = (p_atm + p_atm_below)/2
-    vmr_average = (vmr + vmr_below) /2
-    T_average = (T + T_below) /2
+    col1 = f"{molecule}_iso1_ppmv"
+    col2 = f"{molecule}_iso2_ppmv"
+    col_this = f"{molecule}_iso{isotope}_ppmv"
 
-    #Compute absorption coefficient - this is the most computationally expensive.
+    # default: this isotope's CSV VMR
+    vmr = float(df_atm[col_this].iloc[i]) / 1e6
+    vmr_below = float(df_atm[col_this].iloc[j]) / 1e6
+    vmr_average = 0.5 * (vmr + vmr_below)
+
+    # optional iso1/iso2 rebalancing for one molecule
+    if (
+        isotope_molecule
+        and molecule.upper() == isotope_molecule.upper()
+        and isotope_ratio is not None
+        and col1 in df_atm.columns
+        and col2 in df_atm.columns
+    ):
+        v1 = float(df_atm[col1].iloc[i]) / 1e6
+        v2 = float(df_atm[col2].iloc[i]) / 1e6
+        v1b = float(df_atm[col1].iloc[j]) / 1e6
+        v2b = float(df_atm[col2].iloc[j]) / 1e6
+        v1, v2 = apply_isotope_ratio_vmrs(v1, v2, isotope_ratio)
+        v1b, v2b = apply_isotope_ratio_vmrs(v1b, v2b, isotope_ratio)
+        if isotope == 1:
+            vmr_average = 0.5 * (v1 + v1b)
+        elif isotope == 2:
+            vmr_average = 0.5 * (v2 + v2b)
+
+    print(
+        f" {molecule} iso{isotope} alt={altitude_idx} "
+        f"T={T_average:.1f}K p={P_average:.4f} vmr={vmr_average:.3e}"
+        + (f" (ratio={isotope_ratio:g})" if isotope_molecule and molecule.upper()==isotope_molecule.upper() else "")
+    )
+
     wn, coef = absorptionCoefficient_Voigt(
         Components=[(M, isotope, vmr_average)],
         Diluent={"self": vmr_average, "air": 1.0 - vmr_average},
@@ -70,8 +126,6 @@ def compute_absorption_coefficient(molecule, isotope, dwn, altitude_idx, df_atm,
         Environment={"T": T_average, "p": P_average},
         HITRAN_units=False,
     )
-    
-    
     return wn, coef
 
 def ensure_tables(molecules_isotopes, wn_min, wn_max, hapi_db):
@@ -106,24 +160,30 @@ def main():
     print(f"Layers >= {args.cloud_top} km: {len(altitudes)}")
 
     ensure_tables(molecules_isotopes, wn_min, wn_max, os.path.expanduser(args.hapi_db))
+    
+    iso_mol = args.isotope_molecule
+    iso_ratio = args.isotope_ratio
 
     tasks = []
     for mol, iso in molecules_isotopes:
+        tag = ratio_tag(iso_mol,iso_ratio,mol)
         for alt in altitudes:
-            f = out_dir / f"{mol}_iso{iso}_alt{alt:03d}.npz"
+            f = out_dir / f"{mol}_iso{iso}_alt{alt:03d}{tag}.npz"
             if f.exists():
                 print(f"Skipping {f.name}")
             else:
                 tasks.append((mol, iso, alt))
+                
     print(f"Tasks remaining: {len(tasks)}")
 
     for i, (mol, iso, alt) in enumerate(tasks, 1):
         print(f"[{i}/{len(tasks)}] {mol} iso{iso} alt {alt}")
-        wn, coef = compute_absorption_coefficient(mol, iso, args.dwn, alt, df_atm, wn_min, wn_max)
-        print(f"Molecule {mol} iso{iso} alt{alt} min/max/mean: {np.min(coef)}/{np.max(coef)}/{np.mean(coef)}")
-        np.savez_compressed(out_dir / f"{mol}_iso{iso}_alt{alt:03d}.npz",
+        wn, coef = compute_absorption_coefficient(mol, iso, args.dwn, alt, df_atm, wn_min, wn_max, isotope_molecule = iso_mol, isotope_ratio = iso_ratio)
+        print(f"Molecule {mol} iso{iso} alt{alt} min/max/mean: {np.min(coef)}/{np.max(coef)}/{np.mean(coef)}")   
+        out = out_dir / f"{mol}_iso{iso}_alt{alt:03d}{tag}.npz"        
+        np.savez_compressed(out,
                             wn=wn.astype(np.float32), coef=coef.astype(np.float32))
-        print(f"  → saved ({len(wn)} points)")
+        print(f" -> saved {out.name} ({len(wn)} points)")
         del wn, coef
         gc.collect()
     print("Done.")

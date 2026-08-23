@@ -2,11 +2,11 @@
 #SBATCH --mail-type=BEGIN,END #Mail when job starts and ends
 #SBATCH --mail-user=zaniacco@mit.edu #email recipient
 #SBATCH -p pi_seager
-#SBATCH --job-name=blackbody
+#SBATCH --job-name=hcs_with_ch4_0
 #SBATCH --mem=128G
 #SBATCH --time=05:00:00
-#SBATCH --output=logs/blackbody%j.out
-#SBATCH --error=logs/blackbody-%j.err
+#SBATCH --output=logs/hcs_with_ch4_0%j.out
+#SBATCH --error=logs/hcs_with_ch4_0-%j.err
 
 module load deprecated-modules
 module load anaconda3/2022.05-x86_64
@@ -22,15 +22,5 @@ python -u scripts/02_generate_spectra.py \
   --ref_therm Thermal \
   --cloud-top 0 \
   --albedo 0 \
-  --xsc-dir ~/sgl_science_case/sgl_science_case/data \
-  --xsc-species \
-    Isoprene Butadiene Propene Butene 1-Butyne Limonene Pinene \
-    Benzene Toluene Trimethylbenzene Tetramethylbenzene \
-    DMS DMDS CS2 SF6 SO2F2 \
-    1-Propanethiol 2-Methyl-1-propanethiol 2-Propanethiol \
-    Benzenethiol Cyclohexanethiol DiethylSulfide DMSO \
-    EthylMercaptan Methanethiol MethylIsothiocyanate \
-    Tetrahydrothiophene Thiophene tert-Butylmercaptan \
-  --scenarios \
-    "Blackbody"
-
+  --scenarios "CH4+CH3+C2H2+C2H6+C2H4" \
+  --sigma_r_frac 0

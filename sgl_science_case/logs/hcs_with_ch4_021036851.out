@@ -1,7 +1,20 @@
 
-=== Scenario Blackbody ===
+=== Scenario CH4+CH3+C2H2+C2H6+C2H4 ===
 Computing thermal emission above 0.0 km (50 layers)
-High-res spectrum done in 20.8s  N=94117648
+→ CH4 iso1 (LBL)
+Scale for CH4 = 1.0
+→ CH3 iso1 (LBL)
+Scale for CH3 = 4.0101543335854075e+18
+→ C2H2 iso1 (LBL)
+Scale for C2H2 = 29318361.608084027
+→ C2H6 iso1 (LBL)
+Scale for C2H6 = 878083.03970166
+→ C2H4 iso1 (LBL)
+Scale for C2H4 = 215576248.60817596
+flux range: 1.233e-29 – 3.269e-08
+tau_tot: min/med/max 0.0 166643.97843595204 1715423094704.793
+frac tau>1 0.8023987382260126
+High-res spectrum done in 1068.3s  N=94117648
   Binning to R=1.00e+02
 Wl_native[-1]:17.0, wl_native[0]: 1.0
   Binning to R=2.78e+02
@@ -22,6 +35,6 @@ Wl_native[-1]:17.0, wl_native[0]: 1.0
 Wl_native[-1]:17.0, wl_native[0]: 1.0
   Binning to R=1.00e+06
 Wl_native[-1]:17.0, wl_native[0]: 1.0
-  Saved → /home/zaniacco/orcd/pool/sgl_science_case/spectra_dict_cache_dwn1e-4_hydrocarbons/BLACKBODY.pkl
+  Saved → /home/zaniacco/orcd/pool/sgl_science_case/spectra_dict_cache_dwn1e-4_hydrocarbons/hydrocarbons_with_CH4_R_0.pkl
 
 All scenarios done.
