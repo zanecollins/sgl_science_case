@@ -522,11 +522,12 @@ def main():
     
     sigma_r_frac = args.sigma_r_frac
     
-    # print("Sigma R Frac = ", sigma_r_frac)
+    print("isotope / isotope_ratio: ", isotope_molecule, isotope_ratio)
 
 
     for scen_str in args.scenarios:
         scenario = parse_scenario(scen_str)
+        print("Scenario:", scenario)
         # avoid ":" in filenames on some filesystems
         safe_name = scenario_out_name(scen_str)
         if args.molecule_isotope and args.isotope_ratio is not None:
