@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --mail-type=BEGIN,END #Mail when job starts and ends
-#SBATCH --mail-user=zaniacco@mit.edu #email recipient
+#SBATCH --mail-type=END #Mail when job starts and ends
+#SBATCH --mail-user=zacollins@g.hmc.edu #email recipient
 #SBATCH -p pi_seager
-#SBATCH --job-name=hcs_with_ch4_r0_iso0_scaled
+#SBATCH --job-name=hcs_scaled_debug_test
 #SBATCH --mem=128G
 #SBATCH --time=05:00:00
-#SBATCH --output=logs/hcs_with_ch4_r0_iso0_scaled%j.out
-#SBATCH --error=logs/hcs_with_ch4_r0_iso0_scaled-%j.err
+#SBATCH --output=logs/hcs_scaled_debug_test%j.out
+#SBATCH --error=logs/hsc_scaled_debug_test-%j.err
 
 module load deprecated-modules
 module load anaconda3/2022.05-x86_64
@@ -22,5 +22,5 @@ python -u scripts/02_generate_spectra.py \
   --ref_therm Thermal \
   --cloud-top 0 \
   --albedo 0 \
-  --scenarios "CH4+CH3+C2H2+C2H6+C2H4" \
-  --sigma_r_frac 0
+  --scenarios "CH4+C2H2+C2H6+C2H4+C4H2+CH3" \
+  --output_name "hcs_scaled_debug_test"
