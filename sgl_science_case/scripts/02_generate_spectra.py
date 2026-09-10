@@ -25,6 +25,7 @@ import re
 import time
 from bin_spec import bin_spectrum
 from astropy import constants as const
+import colorednoise as cn
 
 
 def parse_args():
@@ -44,6 +45,8 @@ def parse_args():
     p.add_argument("--xsc-species", nargs="*", default=["Isoprene"],
                    help="Species that use XSC instead of LBL npz (names as in scenario string)")
     p.add_argument("--output_name", type = str, required = True)
+    p.add_argument("--sigma_r_frac",type=float, default = 0)
+
     return p.parse_args()
 
 #### xsc helpers:
@@ -276,11 +279,58 @@ def inject_noise(signal, snr):
 
     noise_std = ref / float(snr)   # constant σ per bin
 
-    noise = rng.normal(0.0, noise_std, size=signal.shape)
+    # noise = rng.normal(0.0, noise_std, size=signal.shape)
+    
+    # Saugata's noise injection:
+    A = cn.powerlaw_psd_gaussian(2, len(signal))
+    noise = noise_std*A/np.mean(A)
+    
     noisy = signal + noise
     errorbars = np.full_like(signal, noise_std)
 
     return noisy.astype(np.float32), errorbars.astype(np.float32)
+
+def inject_white_red_noise(
+    signal,
+    snr_white,
+    sigma_r_frac=0.5,
+    beta=1.0,          # 0=white, 1=pink, 2=Brownian
+    floor_frac=0.05,
+    rng=None,
+):
+    rng = np.random.default_rng() if rng is None else rng
+    y = np.asarray(signal, dtype=np.float64)
+
+    med = np.nanmedian(np.abs(y))
+    if not np.isfinite(med) or med <= 0:
+        med = 1.0
+
+    ref = np.maximum(np.abs(y), floor_frac * med)
+    sigma_w = ref / float(snr_white)
+
+    white = rng.normal(0.0, 1.0, size=y.shape) * sigma_w
+
+    if sigma_r_frac <= 0:
+        return (y + white).astype(np.float32), sigma_w.astype(np.float32)
+
+    # unit-variance 1/f^beta series (Timmer & König)
+    A = cn.powerlaw_psd_gaussian(
+        beta, y.size, random_state=rng
+    )
+    A = A / (np.std(A) + 1e-30)
+
+    sigma_r = float(sigma_r_frac) * sigma_w
+    red = A * sigma_r
+
+    noise = white + red
+    sigma_eff = np.sqrt(sigma_w**2 + sigma_r**2)
+    return (y + noise).astype(np.float32), sigma_eff.astype(np.float32)
+
+
+def pont_V(n, sigma_w, sigma_r):
+    """Paper eq. (9): variance of the mean of n correlated samples."""
+    n = np.asarray(n, dtype=np.float64)
+    return sigma_w**2 / n + sigma_r**2
 
 def planck_wn(wn_cm, T):
     """Planck function in wavenumber units [wn in cm^-1, T in K].
@@ -372,7 +422,7 @@ def compute_thermal_emission(
                 delta_tau_layers = np.zeros((n_layers, wn_grid_ref.size), dtype=np.float64)                
                 
             #NORMALIZING FOR HYDROCARBONS            
-            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos] * scales[(mol,iso)] 
+            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos] #* scales[(mol,iso)] 
 
     # --- if no LBL: seed grid from first XSC ---
     if wn_grid_ref is None:
@@ -386,6 +436,7 @@ def compute_thermal_emission(
 
                 wavelengths_um = (1e4 / wn_grid_ref).astype(np.float32)
                 flux = planck_wn(wn_grid_ref, T_surface).astype(np.float32)
+                flux *= np.pi / const.c.cgs.value
                 order = np.argsort(wavelengths_um)
                 return wavelengths_um[order], flux[order]
             
@@ -480,6 +531,8 @@ def main():
     df_atm = pd.read_csv(args.atmosphere)
     
     t_sc = time.time()
+    
+    sigma_r_frac = args.sigma_r_frac
 
     for scen_str in args.scenarios:
         scenario = parse_scenario(scen_str)
@@ -520,7 +573,13 @@ def main():
                 "resolution": int(R),
             }
             for snr in args.snrs:
-                noisy, err = inject_noise(flux_b, snr)
+                # noisy, err = inject_noise(flux_b, snr)
+                               
+                # Red-noise injection
+                # σ_r is the red noise, where we have taken its contribution as half of the σ of the white noise
+                noisy, err = inject_white_red_noise(
+                    flux_b, snr_white=snr, sigma_r_frac=sigma_r_frac
+                )
                 entry[f"flux_snr{int(snr)}"] = noisy
                 entry[f"error_snr{int(snr)}"] = err
 
