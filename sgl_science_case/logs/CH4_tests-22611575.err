@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 601, in <module>
+    main()
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 547, in main
+    wl_high, flux_high = compute_thermal_emission(
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/orcd/home/002/zaniacco/sgl_science_case/sgl_science_case/scripts/02_generate_spectra.py", line 458, in compute_thermal_emission
+    raise ValueError(f"XSC species {xsc_only} requested but --xsc-dir not set")
+ValueError: XSC species ['Isoprene'] requested but --xsc-dir not set

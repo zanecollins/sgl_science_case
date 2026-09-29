@@ -22,6 +22,7 @@ python -u scripts/02_generate_spectra.py \
   --ref_therm Thermal \
   --cloud-top 0 \
   --albedo 0 \
-  --scenarios "CH3+C2H4+C2H2+C2H6+C4H2" \
-  --output_name "CH3+C2H4+C2H2+C2H6+C4H2_earthlike_r0.5_saugata" \
+  --scenarios "Isoprene+CH3+C2H4+C2H2+C2H6+C4H2" \
+  --xsc-dir ~/sgl_science_case/sgl_science_case/data \
+  --output_name "Isoprene+CH3+C2H4+C2H2+C2H6+C4H2_earthlike_r0.5_saugata" \
   --sigma_r_frac 0.5

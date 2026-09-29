@@ -40,7 +40,7 @@ def parse_args():
     p.add_argument("--snrs", nargs="+", type=float, default=np.logspace(0,3,10))#[5, 10, 25, 50])
     p.add_argument("--scenarios", nargs="+", default=["H2O+CH4", "H2O+CH4+N2O"],
                    help="e.g. H2O+CH4  H2O+CH4+N2O")
-    p.add_argument("--xsc-dir", default="",
+    p.add_argument("--xsc-dir", default="~/sgl_science_case/sgl_science_case/data",
                    help="Directory of HITRAN .xsc files (for isoprene, etc.)")
     p.add_argument("--xsc-species", nargs="*", default=["Isoprene"],
                    help="Species that use XSC instead of LBL npz (names as in scenario string)")

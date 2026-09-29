@@ -1,0 +1,4 @@
+usage: 02_generate_spectra.py [-h] --atmosphere ATMOSPHERE --abs-coef-dir ABS_COEF_DIR --out-dir OUT_DIR --ref_therm REF_THERM [--cloud-top CLOUD_TOP]
+                              [--albedo ALBEDO] [--resolutions RESOLUTIONS [RESOLUTIONS ...]] [--snrs SNRS [SNRS ...]] [--scenarios SCENARIOS [SCENARIOS ...]]
+                              [--xsc-dir XSC_DIR] [--xsc-species [XSC_SPECIES ...]] --output_name OUTPUT_NAME [--sigma_r_frac SIGMA_R_FRAC]
+02_generate_spectra.py: error: unrecognized arguments: --xsec-dir /home/zaniacco/sgl_science_case/sgl_science_case/data
