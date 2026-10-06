@@ -15,6 +15,7 @@ Example:
     --scenarios H2O+CH4 H2O+CH4+N2O \\
 """
 
+
 from __future__ import annotations
 import argparse, gc, os, pickle
 from pathlib import Path
@@ -46,6 +47,8 @@ def parse_args():
                    help="Species that use XSC instead of LBL npz (names as in scenario string)")
     p.add_argument("--output_name", type = str, required = True)
     p.add_argument("--sigma_r_frac",type=float, default = 0)
+    p.add_argument("--scale_to_ch4", action="store_true",
+                   help="Scale each LBL species so its 3-4 um peak coefficient matches CH4")
 
     return p.parse_args()
 
@@ -362,6 +365,7 @@ def compute_thermal_emission(
     T_surface=None,
     xsc_dir="",
     xsc_species=None,
+    scale_to_ch4=False,
 ):
     if xsc_species is None:
         xsc_species = []
@@ -390,7 +394,8 @@ def compute_thermal_emission(
     scales = {}
     wn_ref, coef_ch4 = load_abs_coef("CH4", 1, above_df.index[ref_idx], abs_coef_dir)
     m = window_mask(wn_ref)
-    peak_ch4 = np.max(coef_ch4[m]) * (above_df[f"CH4_iso1_ppmv"].iloc[ref_idx] * 1e-6)
+    # cached coefs already include the VMR, so compare them directly
+    peak_ch4 = np.max(coef_ch4[m])
     #________________________________________________________________________________________________________________________
     
     # --- LBL ---
@@ -406,8 +411,11 @@ def compute_thermal_emission(
         
         wn_grid, coef = load_abs_coef(mol,iso,above_df.index[ref_idx],abs_coef_dir)
         m = window_mask(wn_grid)
-        peak = np.max(coef[m]) * (above_df[f"{mol}_iso{iso}_ppmv"].iloc[ref_idx] * 1e-6)
-        scales[(mol, iso)] = peak_ch4 / peak if peak > 0 else 0.0
+        peak = np.max(coef[m])
+        if scale_to_ch4:
+            scales[(mol, iso)] = peak_ch4 / peak if peak > 0 else 0.0
+        else:
+            scales[(mol, iso)] = 1.0
         print(f"Scale for {mol} = {scales[(mol,iso)]}")
 
 #_______________________________________________________________________________________________________________________________________________________
@@ -422,7 +430,7 @@ def compute_thermal_emission(
                 delta_tau_layers = np.zeros((n_layers, wn_grid_ref.size), dtype=np.float64)                
                 
             #NORMALIZING FOR HYDROCARBONS            
-            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos] #* scales[(mol,iso)] 
+            delta_tau_layers[layer_pos] += coef * dz_cm[layer_pos] * scales[(mol,iso)]
 
     # --- if no LBL: seed grid from first XSC ---
     if wn_grid_ref is None:
@@ -551,6 +559,7 @@ def main():
                 cloud_top=args.cloud_top,
                 xsc_dir=xsc_dir,
                 xsc_species=xsc_species,
+                scale_to_ch4=args.scale_to_ch4,
             )
 #         else:
 #             wl_high, flux_high = compute_reflectivity(
