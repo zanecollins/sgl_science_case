@@ -46,7 +46,8 @@ def parse_args():
     p.add_argument("--xsc-species", nargs="*", default=["Isoprene"],
                    help="Species that use XSC instead of LBL npz (names as in scenario string)")
     p.add_argument("--output_name", type = str, required = True)
-    p.add_argument("--sigma_r_frac",type=float, default = 0)
+    p.add_argument("--eps_sys", type=float, default=1e-3,
+                   help="Red-noise (systematic) amplitude as a fraction of median|F|, independent of SNR; 0 = photon-only")
     p.add_argument("--scale_to_ch4", action="store_true",
                    help="Scale each LBL species so its 3-4 um peak coefficient matches CH4")
 
@@ -296,7 +297,7 @@ def inject_noise(signal, snr):
 def inject_white_red_noise(
     signal,
     snr_white,
-    sigma_r_frac=0.5,
+    eps_sys=1e-3,
     beta=1.0,          # 0=white, 1=pink, 2=Brownian
     floor_frac=0.05,
     rng=None,
@@ -313,7 +314,7 @@ def inject_white_red_noise(
 
     white = rng.normal(0.0, 1.0, size=y.shape) * sigma_w
 
-    if sigma_r_frac <= 0:
+    if eps_sys <= 0:
         return (y + white).astype(np.float32), sigma_w.astype(np.float32)
 
     # unit-variance 1/f^beta series (Timmer & König)
@@ -322,7 +323,7 @@ def inject_white_red_noise(
     )
     A = A / (np.std(A) + 1e-30)
 
-    sigma_r = float(sigma_r_frac) * sigma_w
+    sigma_r = float(eps_sys) * med   # SNR-independent systematic floor
     red = A * sigma_r
 
     noise = white + red
@@ -540,7 +541,7 @@ def main():
     
     t_sc = time.time()
     
-    sigma_r_frac = args.sigma_r_frac
+    eps_sys = args.eps_sys
 
     for scen_str in args.scenarios:
         scenario = parse_scenario(scen_str)
@@ -585,9 +586,9 @@ def main():
                 # noisy, err = inject_noise(flux_b, snr)
                                
                 # Red-noise injection
-                # σ_r is the red noise, where we have taken its contribution as half of the σ of the white noise
+                # σ_r is the red noise: a fixed fraction eps_sys of the median flux, independent of SNR
                 noisy, err = inject_white_red_noise(
-                    flux_b, snr_white=snr, sigma_r_frac=sigma_r_frac
+                    flux_b, snr_white=snr, eps_sys=eps_sys
                 )
                 entry[f"flux_snr{int(snr)}"] = noisy
                 entry[f"error_snr{int(snr)}"] = err
