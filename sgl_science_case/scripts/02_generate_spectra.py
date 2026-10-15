@@ -49,7 +49,7 @@ def parse_args():
     p.add_argument("--eps_sys", type=float, default=1e-3,
                    help="Red-noise (systematic) amplitude as a fraction of median|F|, independent of SNR; 0 = photon-only")
     p.add_argument("--scale_to_ch4", action="store_true",
-                   help="Scale each LBL species so its 3-4 um peak coefficient matches CH4")
+                   help="Scale each species (LBL and XSC) so its 3-4 um peak coefficient matches CH4")
 
     return p.parse_args()
 
@@ -165,10 +165,13 @@ def add_xsc_molecule_tau(
     xsc_dir,
     *,
     use_density=True,
+    peak_target=None,
+    ref_idx=None,
 ):
     """
     Add isothermal XSC opacity onto existing delta_tau_layers (LBL grid).
     XSC σ is cm^2/molecule → Δτ = σ * n * VMR * dz if use_density
+    If peak_target is given, scale so the 3-4 um peak coefficient at layer ref_idx matches it.
     """
     path = find_xsc_file(Path(xsc_dir), mol)
     wn_x, sig = parse_hitran_xsc(path)
@@ -189,7 +192,8 @@ def add_xsc_molecule_tau(
     ppmv_col = above_df[col].astype(float).values
 
     n_layers = len(above_df)
-    for i in range(n_layers):
+
+    def layer_coef(i):
         if i < n_layers - 1:
             ppmv_avg = 0.5 * (ppmv_col[i] + ppmv_col[i + 1])
             n_avg = 0.5 * (density[i] + density[i + 1])
@@ -197,10 +201,17 @@ def add_xsc_molecule_tau(
             ppmv_avg = ppmv_col[i]
             n_avg = density[i]
         vmr = ppmv_avg * 1e-6
-        if use_density:
-            delta_tau_layers[i] += sig_on_grid * n_avg * vmr * dz_cm[i]
-        else:
-            delta_tau_layers[i] += sig_on_grid * vmr * dz_cm[i]
+        return sig_on_grid * n_avg * vmr if use_density else sig_on_grid * vmr
+
+    scale = 1.0
+    if peak_target is not None:
+        m = window_mask(wn_ref)
+        peak = np.max(layer_coef(ref_idx)[m]) if m.any() else 0.0
+        scale = peak_target / peak if peak > 0 else 0.0
+    print(f"Scale for {mol} = {scale}")
+
+    for i in range(n_layers):
+        delta_tau_layers[i] += layer_coef(i) * dz_cm[i] * scale
     return delta_tau_layers
 
 
@@ -469,6 +480,7 @@ def compute_thermal_emission(
         delta_tau_layers = add_xsc_molecule_tau(
             delta_tau_layers, wn_grid_ref, above_df, dz_cm, density,
             mol, xsc_dir, use_density=True,
+            peak_target=peak_ch4 if scale_to_ch4 else None, ref_idx=ref_idx,
         )
 
     if delta_tau_layers is None:
