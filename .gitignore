@@ -208,3 +208,6 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# HITRAN line lists cached by hapi.fetch(); regenerable
+sgl_science_case/notebooks/HAPI_DB/
