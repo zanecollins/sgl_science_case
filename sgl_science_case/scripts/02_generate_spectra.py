@@ -334,7 +334,7 @@ def inject_white_red_noise(
     )
     A = A / (np.std(A) + 1e-30)
 
-    sigma_r = float(eps_sys) * med   # SNR-independent systematic floor
+    sigma_r = float(eps_sys) * med   # We have taken the literature quoted value of roughly 3 mmag (Pont et. al.) SNR-independent systematic floor
     red = A * sigma_r
 
     noise = white + red
