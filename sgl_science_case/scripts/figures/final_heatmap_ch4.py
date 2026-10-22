@@ -1,4 +1,4 @@
-"""Final figure: CH4 detection heat map, peak-scaled hydrocarbons, eps_sys = 1e-3, single stored noise draw, 3-4 um,
+"""Final figure: CH4 detection heat map, peak-scaled hydrocarbons, eps_sys = 1e-3, median of 1000 noise draws, 3-4 um,
 R <= 46415, SNR <= 100, with SGL SNR-R curves (3-4 um thermal, per tile, deconvolution penalty + corona)."""
 import os, numpy as np, pandas as pd, matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt, matplotlib.patches as mpatches, seaborn as sns
@@ -7,7 +7,11 @@ from matplotlib.colors import TwoSlopeNorm
 
 OUT = os.path.expanduser('~/orcd/pool/sgl_science_case/eps_sys_red_noise')
 R_MAX, SNR_MAX, SIGMA_THRESH, WL0, WL1 = 46415, 100, 10.0, 3, 4
-df = pd.read_csv(f'{OUT}/single_draw_detection_eps1e-3_3-4um.csv')
+# median detection score over NDRAW fresh noise realisations per (R, SNR), from eps_sys_analysis.py.
+# NDRAW = 1000: the single-draw score scatters by ~0.8-0.9 sigma, so the median's standard error is
+# ~1.25 * 0.9 / sqrt(1000) ~ 0.035 sigma -- well below the 0.1 printed in each cell.
+NDRAW = 1000
+df = pd.read_csv(f'{OUT}/many_draws_eps1e-3_3-4um.csv').rename(columns={'det_median_score': 'sigma'})
 df = df[(df.resolution <= R_MAX) & (df.snr <= SNR_MAX)]
 
 # SGL SNR-R curves, per tile, with deconvolution penalty and corona (user's whole-image model, N tiles):
@@ -29,7 +33,7 @@ CORONA_FLUX = 1e5           # photons m^-2 s^-1 in the band
 G_SGL = 4 * np.pi**2 * R_G / LAM
 B_phot = lambda l: 2 * c / l**4 / np.expm1(h * c / (l * kB * T_PLANET))   # photons s^-1 m^-2 sr^-1 m^-1
 PHI_1PC = EMIS * np.pi * quad(B_phot, WL0 * 1e-6, WL1 * 1e-6)[0] * (R_earth / pc)**2
-SGL_CASES = [(10, '-')]
+SGL_CASES = []   # SGL curve off until the SNR-R model is settled; e.g. [(10, '-')] for 10 pc
 SGL_COLORS = ['#00e5ff', '#ffd60a', '#7cfc00']
 S_nrbin = np.logspace(0, 2, 400)
 def sgl_R(D_pc):
@@ -73,12 +77,12 @@ for j, Rv in enumerate(pivot.columns):
     ax.add_patch(mpatches.Rectangle((j, i), 1, 1, fill=False, edgecolor='red', linewidth=2.5,
                                     label=rf'min SNR for $\sigma\geq{SIGMA_THRESH:.0f}$' if first else None))
     first = False
-# pinned to the top-right corner of the heat map
-ax.legend(loc='upper right', bbox_to_anchor=(pivot.shape[1] - 0.04, 0.04), bbox_transform=ax.transData, ncol=1,
+# top right, centred on the SNR 100/46 row boundary so it sits between the cell annotations (at cell centres)
+ax.legend(loc='center right', bbox_to_anchor=(pivot.shape[1] - 0.04, 1.0), bbox_transform=ax.transData, ncol=1,
           frameon=True, framealpha=0.92, edgecolor='0.6', fontsize=8.5, labelspacing=0.25, borderpad=0.35)
 ax.set_xlabel('Spectral Resolution'); ax.set_ylabel('SNR per bin')
 ax.set_title(f'Log-Likelihood Detection Score ({WL0}–{WL1} µm)\n'
-             r'CH4 with peak-scaled hydrocarbons, $\epsilon_{\rm sys}=10^{-3}$, single noise draw')
+             rf'CH4 with peak-scaled hydrocarbons, $\epsilon_{{\rm sys}}=10^{{-3}}$, median of {NDRAW} noise draws')
 plt.tight_layout()
 for ext in ('png', 'pdf'):
     fig.savefig(f'{OUT}/final_heatmap_ch4_scaled_eps1e-3_3-4um.{ext}', dpi=200)
